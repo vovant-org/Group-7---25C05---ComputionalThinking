@@ -45,6 +45,11 @@ v0_policy_table,inject_free,freetext|injection|s14,REJECT,ACCEPT,FORMAT_DEFAULTE
 v0_policy_table,inject_structured,injection,ACCEPT,ACCEPT,,1,1
 v0_policy_table,trap_far_duration,freetext|trap,ACCEPT,ACCEPT,FORMAT_DEFAULTED|T_DEFAULTED,1,0
 v0_policy_table,trap_near_duration,freetext|limitation|trap,ACCEPT,ACCEPT,FORMAT_DEFAULTED|T_DEFAULTED,1,0
+v0_policy_table,adv_150s_abbrev,adversarial|freetext|s14,REJECT,ACCEPT,FORMAT_DEFAULTED|T_DEFAULTED,0,0
+v0_policy_table,adv_1000_credits,adversarial|freetext,ACCEPT,ACCEPT,FORMAT_DEFAULTED|T_DEFAULTED,1,0
+v0_policy_table,adv_min_plus_sec,adversarial|freetext,ACCEPT,ACCEPT,FORMAT_DEFAULTED|T_DEFAULTED,1,0
+v0_policy_table,adv_negated_format,adversarial|freetext,ACCEPT,ACCEPT,FORMAT_DEFAULTED|T_DEFAULTED,1,0
+v0_policy_table,adv_topic_says_convert,adversarial|freetext,ACCEPT,ACCEPT,FORMAT_DEFAULTED|T_DEFAULTED,1,0
 v1_hybrid_naive,s14_words_1499,s14|structured,ACCEPT,ACCEPT,,1,1
 v1_hybrid_naive,s14_words_1500,s14|structured,ACCEPT,ACCEPT,,1,1
 v1_hybrid_naive,s14_words_1501,s14|structured,REJECT,REJECT,INPUT_TOO_LONG,1,1
@@ -91,6 +96,11 @@ v1_hybrid_naive,inject_free,freetext|injection|s14,REJECT,REJECT,T_OUT_OF_RANGE,
 v1_hybrid_naive,inject_structured,injection,ACCEPT,ACCEPT,,1,1
 v1_hybrid_naive,trap_far_duration,freetext|trap,ACCEPT,REJECT,T_OUT_OF_RANGE,0,0
 v1_hybrid_naive,trap_near_duration,freetext|limitation|trap,ACCEPT,REJECT,T_OUT_OF_RANGE,0,0
+v1_hybrid_naive,adv_150s_abbrev,adversarial|freetext|s14,REJECT,ACCEPT,T_DEFAULTED,0,0
+v1_hybrid_naive,adv_1000_credits,adversarial|freetext,ACCEPT,REJECT,BUDGET_BELOW_MIN,0,0
+v1_hybrid_naive,adv_min_plus_sec,adversarial|freetext,ACCEPT,ACCEPT,,1,0
+v1_hybrid_naive,adv_negated_format,adversarial|freetext,ACCEPT,CLARIFY,AMBIGUOUS_FORMAT|T_DEFAULTED,0,0
+v1_hybrid_naive,adv_topic_says_convert,adversarial|freetext,ACCEPT,ACCEPT,T_DEFAULTED,1,0
 v2_hybrid_windowed,s14_words_1499,s14|structured,ACCEPT,ACCEPT,,1,1
 v2_hybrid_windowed,s14_words_1500,s14|structured,ACCEPT,ACCEPT,,1,1
 v2_hybrid_windowed,s14_words_1501,s14|structured,REJECT,REJECT,INPUT_TOO_LONG,1,1
@@ -137,3 +147,8 @@ v2_hybrid_windowed,inject_free,freetext|injection|s14,REJECT,REJECT,T_OUT_OF_RAN
 v2_hybrid_windowed,inject_structured,injection,ACCEPT,ACCEPT,,1,1
 v2_hybrid_windowed,trap_far_duration,freetext|trap,ACCEPT,ACCEPT,T_DEFAULTED,1,1
 v2_hybrid_windowed,trap_near_duration,freetext|limitation|trap,ACCEPT,REJECT,T_OUT_OF_RANGE,0,0
+v2_hybrid_windowed,adv_150s_abbrev,adversarial|freetext|s14,REJECT,ACCEPT,T_DEFAULTED,0,0
+v2_hybrid_windowed,adv_1000_credits,adversarial|freetext,ACCEPT,REJECT,BUDGET_BELOW_MIN,0,0
+v2_hybrid_windowed,adv_min_plus_sec,adversarial|freetext,ACCEPT,REJECT,T_OUT_OF_RANGE,0,0
+v2_hybrid_windowed,adv_negated_format,adversarial|freetext,ACCEPT,CLARIFY,AMBIGUOUS_FORMAT|T_DEFAULTED,0,0
+v2_hybrid_windowed,adv_topic_says_convert,adversarial|freetext,ACCEPT,ACCEPT,T_DEFAULTED,1,0

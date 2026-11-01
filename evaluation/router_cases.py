@@ -111,3 +111,15 @@ add("trap_far_duration", Request("Make an infographic video explaining why 5 min
     "ACCEPT", {"T_DEFAULTED"}, I, 90, tags={"freetext", "trap"})
 add("trap_near_duration", Request("Make an infographic video about 5 minutes of yoga"),
     "ACCEPT", {"T_DEFAULTED"}, I, 90, tags={"freetext", "trap", "limitation"})
+
+# ---- adversarial cases added by Vũ Thành Nam
+add("adv_150s_abbrev", Request("Make a 150s infographic video about GDP"),
+    "REJECT", {"T_OUT_OF_RANGE"}, I, 150, tags={"freetext", "s14", "adversarial"})
+add("adv_1000_credits", Request("Make a 90-second infographic video about inflation, budget 1,000 credits"),
+    "ACCEPT", set(), I, 90, tags={"freetext", "adversarial"})
+add("adv_min_plus_sec", Request("Make a 1 minute 30 seconds infographic video about sleep"),
+    "ACCEPT", set(), I, 90, tags={"freetext", "adversarial"})
+add("adv_negated_format", Request("Make an infographic video about sleep, not animation"),
+    "ACCEPT", {"T_DEFAULTED"}, I, 90, tags={"freetext", "adversarial"})
+add("adv_topic_says_convert", Request("Make an infographic video about why studios convert to animation"),
+    "ACCEPT", {"T_DEFAULTED"}, I, 90, intent="new_video", tags={"freetext", "adversarial"})

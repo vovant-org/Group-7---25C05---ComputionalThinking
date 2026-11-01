@@ -1,7 +1,10 @@
 .vs/
 .vscode/
+__pycache__/
+.pytest_cache/
+*.user
+*.suo
 x64/
 Debug/
 Release/
-*.user
-*.suo
+.env

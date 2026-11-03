@@ -16,3 +16,6 @@
 | modules/router | v0, v1, v2 + 46 labeled cases (docs/iteration-log-router.md) |
 | modules/voice_segmenter | F1-F4 + post-TTS repair + tests + benchmark on simulated TTS (docs/iteration-log-voice.md) |
 | scene_segmenter, timeline_assembler, real providers | TODO |
+
+## For team members
+Read `docs/team-brief-next-steps.md`; if you use an AI assistant, start from `docs/ai-assistant-prompt.md`.

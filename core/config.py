@@ -27,3 +27,12 @@ PROFILES = {
         OutputFormat.HYBRID, (M.PAN, M.REVEAL, M.LAYERED, M.CLIP), min_motion_ratio=0.5
     ),
 }
+
+# ---- Voice Segmenter defaults (report 4(f), 5.7). ASSUMPTION: wpm is not measured yet
+# (to-do items 12/14). For Vietnamese, "words" are syllables, so wpm must be measured per language.
+VOICE_WPM = 165.0          # middle of the report's 150-180 wpm range
+VOICE_MIN_S = 10.0
+VOICE_MAX_S = 12.0
+VOICE_TARGET_S = 11.0
+VOICE_MAX_SENTENCES = 2
+VOICE_TOL_S = 1.0          # tolerance used by the post-TTS check (report 5.7)

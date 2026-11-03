@@ -7,7 +7,7 @@ from core.config import OUTPUT_DIR
 from evaluation.router_cases import CASES
 from modules.router.router import route
 
-ALGOS = ["v0_policy_table", "v1_hybrid_naive", "v2_hybrid_windowed"]
+ALGOS = ["v0_policy_table", "v1_hybrid_naive", "v2_hybrid_windowed", "v3_hardened"]
 
 
 def check(case, d):
@@ -31,8 +31,8 @@ def run():
 
 
 def summary(rows):
-    out = ["| Algorithm | Status accuracy | Exact match | S12/S14 limit cases | Injection cases | Free-text exact |",
-           "|---|---|---|---|---|---|"]
+    out = ["| Algorithm | Status accuracy | Exact match | S12/S14 limit cases | Injection cases | Free-text exact | Adversarial exact |",
+           "|---|---|---|---|---|---|---|"]
     for a in ALGOS:
         r = [x for x in rows if x["algorithm"] == a]
         def acc(sel, key):
@@ -41,7 +41,8 @@ def summary(rows):
         out.append(f"| {a} | {acc(lambda x: True, 'status_ok')} | {acc(lambda x: True, 'exact_ok')} "
                    f"| {acc(lambda x: 's14' in x['tags'].split('|'), 'status_ok')} "
                    f"| {acc(lambda x: 'injection' in x['tags'].split('|'), 'status_ok')} "
-                   f"| {acc(lambda x: 'freetext' in x['tags'].split('|'), 'exact_ok')} |")
+                   f"| {acc(lambda x: 'freetext' in x['tags'].split('|'), 'exact_ok')} "
+                   f"| {acc(lambda x: 'adversarial' in x['tags'].split('|'), 'exact_ok')} |")
     return "\n".join(out)
 
 
@@ -53,7 +54,7 @@ if __name__ == "__main__":
         w.writeheader(); w.writerows(rows)
     print(f"cases={len(CASES)} -> outputs/router_benchmark.csv\n")
     print(summary(rows))
-    print("\nFailures of v2 (exact match):")
+    print("\nFailures of v3 (exact match):")
     for x in rows:
-        if x["algorithm"] == "v2_hybrid_windowed" and not x["exact_ok"]:
+        if x["algorithm"] == "v3_hardened" and not x["exact_ok"]:
             print(f"  - {x['case']}: expected {x['expected_status']}, got {x['got_status']} [{x['got_codes']}]")

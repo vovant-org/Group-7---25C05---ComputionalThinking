@@ -90,3 +90,89 @@ def parse_intent(text: str, window: Optional[int] = 2) -> ParsedIntent:
     elif has_i:
         out.fmt = OutputFormat.INFOGRAPHIC
     return out
+
+
+# ======================================================================= v3
+# Hardened parser (answers the 5 adversarial cases found by the team):
+#  (a) more units: "150s", hours;   (b) "1 minute 30 seconds" is ONE duration;
+#  (c) thousands separators in credits ("1,000");  (d) negated formats ("not animation");
+#  (e) only the REQUEST part (text before the topic marker: about/on/why/về...) decides
+#      format and duration; the topic itself can no longer act as a command.
+_TOPIC_MARKER = r"\b(?:about|on|regarding|explaining|explain|why|how|what|về|giải thích|vì sao|tại sao)\b"
+_NEGATED_FMT = (rf"(?:\b(?:not|no|without|instead of|rather than|except)\s+(?:an?\s+)?(?:{_INFO}|{_ANIM}))"
+                rf"|(?:\b(?:không|đừng)\s+(?:phải\s+)?(?:{_INFO}|{_ANIM}))")
+_COMPOUND = r"(\d+)\s*(?:minutes?|mins?|phút)\s*(?:and\s*|và\s*)?(\d+)\s*(?:seconds?|secs?|giây)"
+_DURATION3 = r"(\d+(?:[.,]\d+)?)\s*-?\s*(seconds?|secs?|giây|minutes?|mins?|phút|hours?|hrs?|giờ)"
+_ATTACHED = r"(?<![\d.,])(\d{1,3})(s|h)\b"        # 150s, 2h  (never 1990s: max 3 digits)
+_CREDITS3 = r"(?<![\d.,])(\d{1,3}(?:[.,]\d{3})+|\d+)\s*(?:credits?|tín dụng)"
+_TAIL_CUES = {"long", "lasting", "duration", "length", "dài"}
+
+
+def _to_seconds(value: float, unit: str) -> int:
+    if unit.startswith(("hour", "hr", "giờ", "h")):
+        return int(round(value * 3600))
+    if unit.startswith(("min", "phút")):
+        return int(round(value * 60))
+    return int(round(value))
+
+
+def _head_len(low: str) -> int:
+    m = re.search(_TOPIC_MARKER, low)
+    return m.start() if m and low[:m.start()].strip() else len(low)
+
+
+def _detect_format(s: str) -> tuple[Optional[OutputFormat], bool]:
+    s = re.sub(_NEGATED_FMT, " ", s)
+    has_i, has_a = bool(re.search(_INFO, s)), bool(re.search(_ANIM, s))
+    if re.search(_HYB, s):
+        return OutputFormat.HYBRID, False
+    if has_i and has_a:
+        return (OutputFormat.HYBRID, False) if re.search(_CUE, s) else (None, True)
+    if has_a:
+        return OutputFormat.ANIMATION, False
+    if has_i:
+        return OutputFormat.INFOGRAPHIC, False
+    return None, False
+
+
+def _parse_duration_v3(low: str, head_len: int) -> Optional[int]:
+    cands = []
+    for m in re.finditer(_COMPOUND, low):
+        cands.append((m.start(), m.end(), int(m.group(1)) * 60 + int(m.group(2))))
+    for m in re.finditer(_DURATION3, low):
+        cands.append((m.start(), m.end(), _to_seconds(float(m.group(1).replace(",", ".")), m.group(2))))
+    for m in re.finditer(_ATTACHED, low):
+        cands.append((m.start(), m.end(), _to_seconds(float(m.group(1)), m.group(2))))
+    cands.sort(key=lambda c: (c[0], -(c[1] - c[0])))
+    taken: list[tuple[int, int]] = []
+    for start, end, secs in cands:
+        if any(start < e and s < end for s, e in taken):
+            continue
+        taken.append((start, end))
+        left, right = _words(low[:start]), _words(low[end:])
+        if start < head_len:                                   # request part: needs a video word
+            ok = bool(_ANCHORS.intersection(left[-2:] + right[:2]))
+        else:                                                  # topic part: needs "... long"
+            ok = bool(_TAIL_CUES.intersection(left[-1:] + right[:1]))
+        if ok:
+            return secs
+    return None
+
+
+def parse_intent_v3(text: str) -> ParsedIntent:
+    low = text.lower()
+    out = ParsedIntent()
+    head = low[:_head_len(low)]
+    out.t_target = _parse_duration_v3(low, len(head))
+    if (b := re.search(_CREDITS3, low)):
+        out.budget = int(re.sub(r"[.,]", "", b.group(1)))
+
+    first_words = " ".join(low.split()[:4])
+    if re.search(_SWITCH, first_words) and (tgt := re.search(_SWITCH_TARGET, low)):
+        out.intent, out.fmt = "switch_format", _fmt_of(tgt.group(1))
+        return out
+    fmt, amb = _detect_format(head)
+    if fmt is None and not amb:
+        fmt, amb = _detect_format(low)
+    out.fmt, out.ambiguous_format = fmt, amb
+    return out

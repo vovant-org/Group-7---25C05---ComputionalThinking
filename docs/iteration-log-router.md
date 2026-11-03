@@ -66,3 +66,39 @@ labels follow the report directly. Three points are design decisions, not report
 Known dependency: the `budget_*` boundary labels (14 / 36 / 18) depend on `MODE_COST` in
 `core/config.py`, which is an unmeasured assumption. They must be recomputed after the
 provider cost measurement.
+
+---
+# Update: Router v3 (hardened parser) — 55-case run
+
+Reproduce: `python -m evaluation.router_benchmark`. Cases: the 51 above + 4 added with v3
+(`v3_tail_long`, `v3_tail_long_over`, `v3_topic_minutes_animated`, `v3_decade_not_duration`;
+labels written by Claude from the report, **team must review**).
+
+| Version | Status accuracy | Exact match | Limit cases (S12/S14) | Injection | Free-text exact | Adversarial exact |
+|---|---|---|---|---|---|---|
+| v0 policy table | 46/55 | 27/55 | 9/16 | 1/2 | 1/29 | 0/5 |
+| v1 hybrid naive | 49/55 | 47/55 | 15/16 | 2/2 | 21/29 | 0/5 |
+| v2 hybrid windowed | 49/55 | 48/55 | 15/16 | 2/2 | 22/29 | 0/5 |
+| v3 hardened | 55/55 | 55/55 | 16/16 | 2/2 | 29/29 | 5/5 |
+
+## What v3 changes (one fix per failure mode found by Vũ Thành Nam's cases)
+1. Units `150s` / `2h` / hours are recognized (attached `s` only up to 3 digits, so `1990s`
+   is not a duration - see `v3_decade_not_duration`).
+2. `1 minute 30 seconds` is parsed as one 90 s duration (compound pattern, overlap removal).
+3. `1,000` / `1.000` credits are parsed as 1000 (lookbehind + thousands group).
+4. Negation (`not animation`, `không phải hoạt hình`) removes the format mention first.
+5. The text is split at the topic marker (about / on / why / explain / về / vì sao ...).
+   Format and duration are read from the **request part**; a duration inside the topic is only
+   accepted with an explicit cue (`5 minutes long`). Switch-format needs the verb in the first
+   4 words. This also fixes the old v2 limitation `trap_near_duration` ("about 5 minutes of yoga").
+
+## Honest limits of this result (read before quoting 55/55)
+- v3 was written **after** seeing the 5 adversarial cases, so 5/5 is a regression fix, not
+  proof of generalization. The next test of v3 must be **new** cases nobody has used while coding.
+- Likely new false negatives introduced by item 5: "make a video about inflation **in 90
+  seconds**" (duration in the topic part without a cue) is now ignored and defaults to 90 s.
+  Team: add this and similar cases before trusting v3.
+- Still fail-open: an unknown unit (e.g. `ninety seconds`, `1.5 phut` without diacritics) is
+  silently ignored and the default 90 s is used (violates "hard limits independent of parser").
+  Planned v4: fail-closed rule (a number next to a video word with unknown unit -> CLARIFY),
+  or a real LLM behind `parse_intent` for missing information only.

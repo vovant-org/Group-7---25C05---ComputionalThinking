@@ -5,6 +5,8 @@ Versions (report 5.9.1):
   v0_policy_table     A1: only structured fields are read (no free-text understanding)
   v1_hybrid_naive     A4: rules + intent parser (naive duration regex)
   v2_hybrid_windowed  A4: same, but a duration only counts if a video word is nearby
+  v3_hardened         A4: request part vs topic part, more units, compound durations,
+                      thousands separators, negation (fixes the adversarial cases)
 """
 from __future__ import annotations
 
@@ -17,7 +19,7 @@ from typing import Optional
 from core.config import DEFAULT_FORMAT, DEFAULT_T_TARGET, PROFILES
 from core.models import OutputFormat, Scene
 from modules.budget_optimizer.optimizer import min_cost_with_motion
-from modules.router.intent_parser import ParsedIntent, parse_intent, strip_quantities
+from modules.router.intent_parser import ParsedIntent, parse_intent, parse_intent_v3, strip_quantities
 
 MAX_INPUT_WORDS = 1500
 T_MIN, T_MAX = 60, 120
@@ -84,6 +86,8 @@ def route(req: Request, algorithm: str = "v2_hybrid_windowed") -> RouteDecision:
         parsed = parse_intent(req.topic, window=None)
     elif algorithm == "v2_hybrid_windowed":
         parsed = parse_intent(req.topic, window=2)
+    elif algorithm == "v3_hardened":
+        parsed = parse_intent_v3(req.topic)
     elif algorithm != "v0_policy_table":
         raise ValueError(algorithm)
 

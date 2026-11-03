@@ -123,3 +123,13 @@ add("adv_negated_format", Request("Make an infographic video about sleep, not an
     "ACCEPT", {"T_DEFAULTED"}, I, 90, tags={"freetext", "adversarial"})
 add("adv_topic_says_convert", Request("Make an infographic video about why studios convert to animation"),
     "ACCEPT", {"T_DEFAULTED"}, I, 90, intent="new_video", tags={"freetext", "adversarial"})
+
+# ---- v3 cases added with Router v3 (labels written by Claude from the report: TEAM MUST REVIEW)
+add("v3_tail_long", Request("Make an infographic video about inflation, 90 seconds long"),
+    "ACCEPT", set(), I, 90, tags={"freetext", "v3"})
+add("v3_tail_long_over", Request("Make a video about inflation, 5 minutes long"),
+    "REJECT", {"T_OUT_OF_RANGE", "FORMAT_DEFAULTED"}, I, 300, tags={"freetext", "s14", "v3"})
+add("v3_topic_minutes_animated", Request("Make an animated video about 5 minutes of yoga"),
+    "ACCEPT", {"T_DEFAULTED"}, A, 90, tags={"freetext", "trap", "v3"})
+add("v3_decade_not_duration", Request("Make a 90-second infographic video about 1990s inflation"),
+    "ACCEPT", set(), I, 90, tags={"freetext", "v3"})

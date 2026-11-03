@@ -29,16 +29,19 @@ person and evidence (commit / file / command). Items marked `TODO` are not fille
 
 | Who | What | Evidence |
 |---|---|---|
-| Vũ Thành Nam | Replaced the Router files with the v3 version (request/topic split, more units, compound durations, thousands separators, negation) and re-ran tests and benchmark. | `py -m pytest -q`: 152 passed in 2.69s; router_benchmark: v3 exact match 55/55, adversarial 5/5; commit `4be6a28` |
-| Whole team | `TODO`: review the 4 new `v3_*` cases in `evaluation/router_cases.py` (labels were written by the AI assistant from the report) | `TODO` |
-| Whole team | `TODO`: each remaining member writes ≥ 5 new cases to break Router v3 (tag e.g. `adversarial_r2`), without reading the v3 code first | `TODO` |
+| Vũ Thành Nam | Replaced the Router files with v3 (request/topic split, more units, compound durations, thousands separators, negation), re-ran the tests (152 passed in 2.69 s) and pushed Router v3. | Commit `4be6a28` "Router v3: request/topic split, adversarial exact 0/5 -> 5/5" |
+| Vũ Thành Nam | **[conditional]** Ran `py -m evaluation.router_benchmark`: v3 exact match 55/55, adversarial 5/5 (v2: 48/55 and 0/5). | Terminal output |
+| Vũ Thành Nam | Updated the team logbook with the Router v3 run and commit hash. | Commit `e554b3c` "Update team logbook" |
+| Vũ Thành Nam | Pulled the Voice Segmenter (F1 greedy, F2/F3/F4 DP, post-TTS repair, simulated TTS), ran `py -m pytest -q` (177 passed in 2.85 s) and `py -m evaluation.voice_benchmark`. Tables A, B and C matched the reference run (e.g. F1/no calibration S19 25.3%, F4/wpm+pause 37.7%). Pushed it. | Terminal output; commit `8cde9df` |
+| Vũ Thành Nam | Integrated the TTS measurement tools (`measure_tts.py`, `fit_tts_model.py`) and the team brief (180 tests passed); pushed them. | Commit `f313f8d` "Add team brief and TTS measurement tools" |
+| Vũ Thành Nam | **[conditional, after you send it]** Shared the next-step brief (`docs/team-brief-next-steps.md`) with the team and assigned tasks. | Group chat message / issue link `<link>` |
 
 ## Contribution summary (update every week)
 
 | Member | Analysis | Design | Implementation | Evaluation | Communication / docs |
 |---|---|---|---|---|---|
 | Võ Văn Thiện | TODO | TODO | TODO | TODO | TODO |
-| Vũ Thành Nam | Reviewed Router labels against the report | Documented 3 Router design decisions | Ran, integrated and pushed Budget Optimizer and Router versions | Wrote 5 adversarial Router cases; reproduced benchmarks on his machine | Updated `iteration-log-router.md` |
+| Vũ Thành Nam | Reviewed the Router labels against the report; checked that the Voice Segmenter and Router results reproduce on a second machine | Documented 3 Router design decisions | Ran, integrated and pushed the Budget Optimizer, Router (v0–v3) and Voice Segmenter; integrated the TTS measurement tools | Wrote 5 adversarial Router cases that broke v2; reproduced all benchmarks on his machine | Updated `iteration-log-router.md` and the team logbook; shared the next-step brief with the team |
 | Vũ Tiến Thắng | TODO | TODO | TODO | TODO | TODO |
 | Phan Minh Tiến | TODO | TODO | TODO | TODO | TODO |
 | Nguyễn Ngọc Hải | TODO | TODO | TODO | TODO | TODO |
@@ -56,10 +59,14 @@ team ran itself.
 | 2026-11-01 | Claude | Repo plan; `core/models.py`, `core/config.py`; Budget Optimizer v0/v1/v2; `test_optimizer.py`; `budget_benchmark.py`; `iteration-log.md` | Ran `pytest` (6 passed) and the benchmark on a Windows machine; numbers matched the reference run (218/246, 218/246, 246/246). Test compares DP v2 with brute force on small cases. |
 | 2026-11-01 | Claude | Router v0/v1/v2; `intent_parser.py`; 46 labeled cases; `router_benchmark.py`; `test_router.py`; `iteration-log-router.md` | Ran `pytest` (83 passed) and the benchmark; numbers matched (27/46, 44/46, 45/46). Nam reviewed all labels against the report and added adversarial cases that exposed 5 real failures. |
 | 2026-11-03 | Claude | Router v3; 4 new `v3_*` cases; updated `test_router.py` and iteration log | Nam ran `py -m pytest -q` (152 passed) and `evaluation.router_benchmark` (v3 55/55) on a Windows machine; numbers matched the reference run. Known caveat (written in the log): v3 was written after the adversarial cases were known, so 5/5 is a regression fix, not generalization. New unseen cases are needed. |
+| 2026-11-03 | Claude | Router v3 and 4 new `v3_*` cases; updated `test_router.py` and the Router iteration log | Nam ran `py -m pytest -q` (152 passed). Known caveat (written in the log): v3 was written after the adversarial cases were known, so 5/5 is a regression fix, not generalization; new unseen cases are needed. |
+| 2026-11-03 | Claude | Voice Segmenter (F1–F4, post-TTS repair, simulated TTS), benchmark, tests and iteration log; TTS measurement tools; team brief | Nam ran `py -m pytest -q` (177 passed) and `py -m evaluation.voice_benchmark`; numbers matched the reference run. The TTS is simulated and is labelled as such in the iteration log; it must be re-measured with a real TTS before S19 is quoted. |
 
 Things the AI got wrong or overstated, found by the team (keep this honest list):
 - It said Python 3.10+ was required; the code runs on Python 3.9 (confirmed on the team machine).
 - `TODO`: add anything else found while reviewing.
+- It first recommended objective F3 for the Voice Segmenter; a counter-example analysis ([3 s, 11 s, 3 s, 11 s]) showed F3 ties with the worse solution, so F4 was added.
+- The report's own F1 pseudocode (not written by the AI) can emit a 3-sentence voice; the invariant test caught it and the iteration log documents it.
 
 ## Open items
 

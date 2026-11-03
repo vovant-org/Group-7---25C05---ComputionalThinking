@@ -34,24 +34,25 @@ def make_script(rng: random.Random, idx: int, t_target: int) -> list[str]:
     return sents
 
 
-def params_for(cal: str, true_wpm: float, max_sentences: int = 2) -> VoiceParams:
+def params_for(cal: str, true_wpm: float, max_sentences: int = 2, pause: float = TRUE_PAUSE) -> VoiceParams:
     if cal == "none":
         return VoiceParams(max_sentences=max_sentences)
     if cal == "wpm":
         return VoiceParams(wpm=true_wpm, max_sentences=max_sentences)
-    return VoiceParams(wpm=true_wpm, pause_s=TRUE_PAUSE, max_sentences=max_sentences)
+    return VoiceParams(wpm=true_wpm, pause_s=pause, max_sentences=max_sentences)
 
 
-def evaluate(n_scripts: int, seed: int, algos=None, max_sentences: int = 2, cals=CALIBRATIONS):
+def evaluate(n_scripts: int, seed: int, algos=None, max_sentences: int = 2, cals=CALIBRATIONS,
+             wpm_range=(145.0, 185.0), pause: float = TRUE_PAUSE, noise: float = 0.06):
     rng = random.Random(seed)
     rows = []
     for idx in range(n_scripts):
         t = rng.choice([60, 90, 120])
         script = make_script(rng, idx, t)
-        true_wpm = rng.uniform(145, 185)
-        tts = MockTTS(true_wpm, pause_s=TRUE_PAUSE, seed=seed)
+        true_wpm = rng.uniform(*wpm_range)
+        tts = MockTTS(true_wpm, noise_sd=noise, pause_s=pause, seed=seed)
         for cal in cals:
-            p = params_for(cal, true_wpm, max_sentences)
+            p = params_for(cal, true_wpm, max_sentences, pause)
             for algo in (algos or ALGORITHMS):
                 seg = segment_voices(script, algo, p)
                 est_ok = sum(in_band(u.est_s, p, i == len(seg.units) - 1) for i, u in enumerate(seg.units))
@@ -102,11 +103,11 @@ def summarize(rows):
     return "\n".join(out)
 
 
-def sensitivity(n_scripts: int, seed: int):
+def sensitivity(n_scripts: int, seed: int, **kw):
     out = ["**C. Max sentences per voice, F4_dp_share, wpm+pause calibrated, no repair**\n",
            HEAD.format(first="Max sentences")]
     for k in (1, 2, 3):
-        rows = evaluate(n_scripts, seed, ["F4_dp_share"], k, ("wpm+pause",))
+        rows = evaluate(n_scripts, seed, ["F4_dp_share"], k, ("wpm+pause",), **kw)
         out.append(_line(str(k), [x for x in rows if x["repair"] == 0]))
     return "\n".join(out)
 
@@ -115,13 +116,18 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=300)
     ap.add_argument("--seed", type=int, default=11)
+    ap.add_argument("--wpm-lo", type=float, default=145.0, help="lowest true wpm of the TTS (measured)")
+    ap.add_argument("--wpm-hi", type=float, default=185.0, help="highest true wpm of the TTS (measured)")
+    ap.add_argument("--pause", type=float, default=TRUE_PAUSE, help="pause after each sentence, s (measured)")
+    ap.add_argument("--noise", type=float, default=0.06, help="relative duration noise per sentence (measured)")
     a = ap.parse_args()
-    rows = evaluate(a.n, a.seed)
+    tts_kw = dict(wpm_range=(a.wpm_lo, a.wpm_hi), pause=a.pause, noise=a.noise)
+    rows = evaluate(a.n, a.seed, **tts_kw)
     OUTPUT_DIR.mkdir(exist_ok=True)
     with open(OUTPUT_DIR / "voice_benchmark.csv", "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0]))
         w.writeheader()
         w.writerows(rows)
-    print(f"scripts={a.n} seed={a.seed} (SIMULATED TTS, pause={TRUE_PAUSE}s) -> outputs/voice_benchmark.csv\n")
+    print(f"scripts={a.n} seed={a.seed} (SIMULATED TTS: wpm {a.wpm_lo}-{a.wpm_hi}, pause {a.pause}s, noise {a.noise}) -> outputs/voice_benchmark.csv\n")
     print(summarize(rows))
-    print("\n" + sensitivity(a.n, a.seed))
+    print("\n" + sensitivity(a.n, a.seed, **tts_kw))

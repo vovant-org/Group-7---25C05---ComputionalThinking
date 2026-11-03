@@ -6,6 +6,7 @@
     python -m evaluation.budget_benchmark       # -> outputs/budget_benchmark.csv
     python -m evaluation.router_benchmark       # -> outputs/router_benchmark.csv
     python -m evaluation.voice_benchmark        # -> outputs/voice_benchmark.csv (simulated TTS)
+    python -m evaluation.measure_tts --make-manifest   # real TTS measurement workflow, see docs/team-brief-next-steps.md
 
 ## Status
 | Module | State |

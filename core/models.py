@@ -75,3 +75,33 @@ class OptimizeResult:
     reason: str = ""
     suggestion: str = ""
     algorithm: str = ""
+
+
+@dataclass
+class TimelineEntry:
+    """One placed scene on the timeline (report 5.5). Times are in seconds."""
+    scene_id: int
+    start_s: float
+    duration_s: float                  # on-screen length = max(audio + pad, t_min)
+    audio_duration_s: float            # real (or simulated) narration length
+    pad_s: float = 0.0
+    render_mode: Optional[RenderMode] = None
+    transition_in: str = "cut"
+    claim_ids: list[str] = field(default_factory=list)
+    narration: str = ""
+ 
+ 
+@dataclass
+class Timeline:
+    """Output of the Timeline Assembler. `codes` empty means S12/S13 and the scene rules hold."""
+    entries: list[TimelineEntry] = field(default_factory=list)
+    total_s: float = 0.0
+    t_target: float = 0.0
+    deviation: float = 0.0             # |total - t_target| / t_target   (S13 threshold: 0.05)
+    codes: set[str] = field(default_factory=set)
+    stretched: list[int] = field(default_factory=list)   # scene_ids lengthened up to t_min
+    too_long: list[int] = field(default_factory=list)    # scene_ids longer than t_max
+ 
+    @property
+    def ok(self) -> bool:
+        return not self.codes

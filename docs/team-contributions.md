@@ -71,6 +71,7 @@ Rules for this file
 | `8958d14` | 2026-11-03 | namvuthanh15 | update team contributions |
 | `3624ef0` | 2026-11-03 | namvuthanh15 | add ai-assistant to tell others what to do |
 | `09ad369` | 2026-11-03 | namvuthanh15 | Scene Segmenter: MMR + facet constraint, gold coverage 65% -> 88% (synthetic) |
+| `` |
 
 Other members: add the commits / PRs you authored here (hash, date, your Git account, message).
 

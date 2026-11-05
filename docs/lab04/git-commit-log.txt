@@ -1,0 +1,24 @@
+﻿2fbd3f7 2026-11-05 namvuthanh15 | Lab04: report, AI declaration, screenshots
+d426b01 2026-11-05 namvuthanh15 | Lab04 phase 4b (implement): Streamlit demo page
+0f2c118 2026-11-05 namvuthanh15 | Lab04 phase 4a (implement): pipeline orchestrator, fixtures, CLI, 24 tests (248 pass)
+b9ae490 2026-11-05 namvuthanh15 | Lab04 phase 3 (tasks): task breakdown
+6499641 2026-11-05 namvuthanh15 | Lab04 phase 2 (plan): plan, user story, sequence and activity diagrams
+dfb6c16 2026-11-05 namvuthanh15 | Lab04 phase 1 (specify): spec for the pipeline demo
+8b86546 2026-11-05 namvuthanh15 | update logbook
+a33a6b3 2026-11-04 namvuthanh15 | Timeline Assembler v0: S12/S13 checks, 21 tests (224 pass)
+ad0b67c 2026-11-04 namvuthanh15 | update and fix logbook
+09ad369 2026-11-03 namvuthanh15 | Scene Segmenter: MMR + facet constraint, gold coverage 65% -> 88% (synthetic)
+3624ef0 2026-11-03 namvuthanh15 | add ai-assistant to tell others what to do
+8958d14 2026-11-03 namvuthanh15 | update team contributions
+f313f8d 2026-11-03 namvuthanh15 | Add team brief and TTS measurement tools
+8cde9df 2026-11-03 namvuthanh15 | Voice Segmenter F1-F4: S19 25.3% -> 35.0% (simulated TTS)
+e554b3c 2026-11-03 namvuthanh15 | Update team logbook
+4be6a28 2026-11-03 namvuthanh15 | Router v3: request/topic split, adversarial exact 0/5 -> 5/5
+4418145 2026-11-01 namvuthanh15 | 5 adversarial router cases and update iteration log
+b1a6ee4 2026-11-01 namvuthanh15 | Router v2: hybrid rules + intent parser, free-text exact 1/20 -> 19/20
+741e639 2026-11-01 namvuthanh15 | v2: DP motion-state optimizer, infographic feasibility 88.6% -> 100%
+6c10093 2026-10-27 vvt | Create core file .md in docs folder
+bf98b75 2026-10-27 vvt | Create core file python in tests folder
+fa33e79 2026-10-27 vvt | Create a core flle python for each primary folder modules
+835533c 2026-10-27 vvt | Construct primary folders for entire project
+4993573 2026-10-14 vovant-org | Initial commit

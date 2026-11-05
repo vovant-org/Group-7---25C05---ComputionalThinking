@@ -46,6 +46,11 @@ Rules for this file
 | Vũ Thành Nam | Shared the brief and the AI-assistant prompt with the team and assigned the next tasks (TTS measurement, cost measurement, requirements/architecture docs, issue board, 5 new Router cases per member). | Group chat message / issue link `<link>` |
 | Vũ Thành Nam | Process decision: contributions are logged per person with evidence; work is not recorded under another member's name. Teammates' rows stay `TODO` until they fill them in. | This file |
 
+### 2026-11-05 (Thus)
+| Who | What | Evidence |
+|---|---|---|
+| Vũ Thành Nam | Wrote Timeline Assembler v0 (`assemble()`, `Timeline`, `TimelineEntry`): scenes placed by audio duration, S12/S13 checks, 21 tests. Ran `py -m pytest -q`: 224 passed. PR #1 merged by Võ Văn Thiện. | PR #1, commit `a33a6b3` "Timeline Assembler v0: S12/S13 checks, 21 tests (224 pass)", PR #1, merged as `4671254` |
+
 ### Tasks assigned to the team (to be filled in by each member)
 
 | Who | Task | Evidence |
@@ -100,6 +105,7 @@ Policy reminder: AI output is not evidence by itself; every result below comes f
 | 2026-11-03 | Claude | TTS measurement tools (`measure_tts.py`, `fit_tts_model.py`), parametrised `voice_benchmark.py`, `team-brief-next-steps.md` | Nam ran `py -m pytest -q` (180 passed); the default benchmark output is unchanged. The tools were only tested on generated audio and synthetic data; the member doing the measurement must verify them on real TTS audio. Commit `f313f8d`. |
 | 2026-11-03 | Claude | `ai-assistant-prompt.md` (mentor prompt and per-member task blocks) | Nam read the rules and the file references; it will be validated when teammates use it. Commit `3624ef0`. |
 | 2026-11-03 | Claude | Scene Segmenter (D1/D2/D2f, scenes and layouts), hand-written cases, `scene_benchmark.py`, tests, `iteration-log-scene.md` | **[conditional]** Nam ran `py -m pytest -q` (203 passed) and `py -m evaluation.scene_benchmark`; numbers matched. The benchmark data is synthetic (an assumption) and the two hand-written cases were labelled by the AI; the team must review them and add its own hard cases. Commit `09ad369`. |
+| 2026-11-04 | Claude | Draft of `assembler.py`, `Timeline`/`TimelineEntry` in `core/models.py`, `test_timeline_assembler.py` | Nam ran `py -m pytest -q` (224 passed). Known caveats: `pad_s` = 0.0 is an assumption (TTS pause not measured); each scene is voiced separately, which may not match the 10-12 s voice units. No benchmark yet (single version, simulated audio). PR #1, commit `a33a6b3`. |
 
 Things the AI got wrong or overstated, found during review (keep this list honest):
 - It said Python 3.10+ was required; the code runs on Python 3.9 (confirmed on the team machine).

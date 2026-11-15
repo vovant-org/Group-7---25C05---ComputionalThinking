@@ -8,6 +8,13 @@ passes its result on or stops the run with a status that says which stage stoppe
 SIMULATED parts (labelled so in the UI and the report):
   * the claims come from `sample_claims.py` (the REASON step is not built yet)
   * narration durations come from `MockTTS` (no real TTS has been measured yet)
+
+VOICE CHOICE (optional): pass a `VoiceProfile` from the voice library (+ a speaking speed). It
+  * sets the speaking rate the planner assumes (`voice.planning_wpm(speed)`; the library's
+    ASSUMED default until that voice has been measured), for claim selection and voice units;
+  * is checked against the narration language: an English voice never reads Vietnamese claims
+    (stage VOICE stops with VOICE_LANGUAGE_MISMATCH, before anything is planned).
+Without a voice the behaviour is exactly what it was before the voice library existed.
 """
 from __future__ import annotations
 
@@ -23,6 +30,8 @@ from modules.router.intent_parser import parse_intent_v3
 from modules.router.router import Request, RouteDecision, RouteStatus, route
 from modules.scene_segmenter.segmenter import Claim, SegParams, Selection, build_scenes, select_claims
 from modules.timeline_assembler.assembler import assemble, scene_audio_durations
+from modules.voice_library.language import detect_language
+from modules.voice_library.library import LANGUAGES, VoiceProfile
 from modules.voice_segmenter.segmenter import (VoiceParams, VoiceSegmentation, in_band,
                                                segment_voices, split_sentences)
 
@@ -47,6 +56,7 @@ class PipelineStatus(str, Enum):
     OK = "OK"
     ROUTER_REJECTED = "ROUTER_REJECTED"
     ROUTER_CLARIFY = "ROUTER_CLARIFY"
+    VOICE_LANGUAGE_MISMATCH = "VOICE_LANGUAGE_MISMATCH"
     SCENES_INVALID = "SCENES_INVALID"
     BUDGET_INFEASIBLE = "BUDGET_INFEASIBLE"
     TIMELINE_CHECKS_FAILED = "TIMELINE_CHECKS_FAILED"
@@ -73,6 +83,9 @@ class PipelineResult:
     budget_source: str = ""                            # request | text | auto
     optimize: Optional[OptimizeResult] = None
     voice: Optional[VoiceSegmentation] = None
+    voice_profile: Optional[VoiceProfile] = None       # the voice the user picked (None = no choice)
+    voice_speed: float = 1.0
+    planning_wpm: float = VOICE_WPM                    # speaking rate the planner assumed
     voice_in_band_share: Optional[float] = None        # S19 on the ESTIMATED durations
     timeline: Optional[Timeline] = None
     messages: list[str] = field(default_factory=list)
@@ -115,10 +128,16 @@ def run_pipeline(request: Request, claims: Sequence[Claim], *,
                  optimizer_algorithm: str = "v2_dp_motion_state",
                  voice_algorithm: str = "F4_dp_share",
                  tts: Optional[Callable[[tuple[str, ...]], float]] = None,
-                 pad_s: float = 0.0) -> PipelineResult:
-    """Run the five stages in order and stop at the first one that fails."""
-    tts = tts or MockTTS(**DEFAULT_TTS_PARAMS)
-    res = PipelineResult(request=request)
+                 pad_s: float = 0.0,
+                 voice: Optional[VoiceProfile] = None,
+                 voice_speed: float = 1.0) -> PipelineResult:
+    """Run the five stages in order and stop at the first one that fails.
+
+    `voice` / `voice_speed` come from the voice library; ValueError if the speed is out of range."""
+    planning_wpm = voice.planning_wpm(voice_speed) if voice is not None else VOICE_WPM
+    tts = tts or MockTTS(**{**DEFAULT_TTS_PARAMS, "true_wpm": planning_wpm})
+    res = PipelineResult(request=request, voice_profile=voice, voice_speed=voice_speed,
+                         planning_wpm=planning_wpm)
 
     # 1. Router -------------------------------------------------------------
     d = route(request, router_algorithm)
@@ -134,8 +153,18 @@ def run_pipeline(request: Request, claims: Sequence[Claim], *,
                                f"ACCEPT: {d.fmt.value}, {d.t_target} s, {d.word_count} input words"))
     profile = PROFILES[d.fmt]
 
+    # Voice choice: an English voice must not read Vietnamese narration (or the other way round).
+    if voice is not None:
+        spoken = detect_language(" ".join(c.text for c in claims))
+        if spoken is not None and spoken != voice.language:
+            return _stop(res, Stage.VOICE, PipelineStatus.VOICE_LANGUAGE_MISMATCH,
+                         f"voice {voice.name} speaks {voice.language}, narration is {spoken}",
+                         [f"The narration is in {LANGUAGES[spoken]} but the voice {voice.name} speaks "
+                          f"{LANGUAGES[voice.language]}. Choose a voice for {LANGUAGES[spoken]} narration, "
+                          f"or switch to a claim pack in {LANGUAGES[voice.language]}."])
+
     # 2. Scene Segmenter ----------------------------------------------------
-    params = SegParams()
+    params = SegParams(wpm=planning_wpm)
     res.selection = select_claims(list(claims), d.t_target, selection_algorithm, params)
     res.scenes, res.scene_report = build_scenes(res.selection, d.fmt, params, profile.t_min, profile.t_max)
     rep = res.scene_report
@@ -161,11 +190,14 @@ def run_pipeline(request: Request, claims: Sequence[Claim], *,
 
     # 4. Voice Segmenter ----------------------------------------------------
     sentences = [s for sc in res.scenes for s in split_sentences(sc.narration)]
-    res.voice = segment_voices(sentences, voice_algorithm, VoiceParams())
-    res.voice_in_band_share = voice_band_share(res.voice)
+    voice_params = VoiceParams(wpm=planning_wpm)
+    res.voice = segment_voices(sentences, voice_algorithm, voice_params)
+    res.voice_in_band_share = voice_band_share(res.voice, voice_params)
+    who = "" if voice is None else f"; voice {voice.name} x{voice_speed:g} at {planning_wpm:.0f} wpm" \
+        + ("" if voice.wpm_is_measured else " (assumed)")
     res.stages.append(StageLog(Stage.VOICE, True,
                                f"{len(res.voice.units)} voice units, {res.voice_in_band_share:.0%} in "
-                               f"10-12 s band (estimated, {res.voice.algorithm})"))
+                               f"10-12 s band (estimated, {res.voice.algorithm}){who}"))
 
     # 5. Timeline Assembler -------------------------------------------------
     durations = scene_audio_durations(res.scenes, tts)

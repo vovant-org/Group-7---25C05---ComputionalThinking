@@ -14,6 +14,7 @@ import pandas as pd
 from core.config import PROFILES
 from core.models import TimelineEntry
 from modules.pipeline.pipeline import PipelineResult
+from modules.voice_library.library import VoiceLibrary, VoiceProfile
 from modules.voice_segmenter.segmenter import VoiceParams, in_band
 
 _EPS = 1e-9
@@ -138,9 +139,12 @@ def result_summary(res: PipelineResult) -> str:
     d, tl = res.decision, res.timeline
     if not res.ok or d is None or tl is None or res.optimize is None or res.voice is None:
         return ""
-    return (f"{d.fmt.value} · {tl.total_s:.1f} s (target {tl.t_target:.0f} s) · {len(res.scenes)} scenes · "
+    text = (f"{d.fmt.value} · {tl.total_s:.1f} s (target {tl.t_target:.0f} s) · {len(res.scenes)} scenes · "
             f"cost {res.optimize.total_cost}/{res.budget} · motion {res.optimize.motion_ratio:.0%} · "
             f"{len(res.voice.units)} voice units")
+    if res.voice_profile is not None:
+        text += f" · voice {res.voice_profile.name}"
+    return text
 
 
 def scene_rows(res: PipelineResult) -> list[dict]:
@@ -165,6 +169,36 @@ def voice_rows(res: PipelineResult, p: VoiceParams = VoiceParams()) -> list[dict
     return [{"unit": i, "sentences": len(u.sentences), "est_s": round(u.est_s, 1),
              "in 10–12 s": "✅" if in_band(u.est_s, p, last=(i == n - 1)) else "❌", "text": u.text}
             for i, u in enumerate(res.voice.units)]
+
+
+# ------------------------------------------------------------------ voice library
+def voice_option_label(v: VoiceProfile) -> str:
+    """Text of one entry in the voice picker, e.g. 'Hoài My — female, vi-VN'."""
+    return f"{v.name} — {v.gender}, {v.locale}"
+
+
+def voice_caption(v: VoiceProfile, speed: float = 1.0) -> str:
+    """One line under the picker: the speaking rate the planner will use, and whether it is a measurement."""
+    basis = "measured" if v.wpm_is_measured else "assumed, not measured yet"
+    return f"Planned at {v.planning_wpm(speed):.0f} words/min ({basis})."
+
+
+def voice_library_rows(lib: VoiceLibrary, language: Optional[str] = None) -> list[dict]:
+    """Rows of the voice-library table (one per voice)."""
+    return [{"id": v.voice_id, "name": v.name, "language": v.language, "locale": v.locale,
+             "gender": v.gender, "wpm": round(v.base_wpm), "wpm source": "measured" if v.wpm_is_measured else "assumed",
+             "engine voice": v.engine_voice, "default": "★" if lib.default(v.language) == v else ""}
+            for v in lib.list(language=language)]
+
+
+def voice_info(res: PipelineResult) -> str:
+    """Which voice a run used; empty when no voice was chosen."""
+    v = res.voice_profile
+    if v is None:
+        return ""
+    basis = "measured" if v.wpm_is_measured else "assumed"
+    return (f"Voice: {v.label} · speed ×{res.voice_speed:g} · planned at {res.planning_wpm:.0f} words/min ({basis}). "
+            "Durations still come from the simulated TTS.")
 
 
 # ------------------------------------------------------------------ benchmark evidence

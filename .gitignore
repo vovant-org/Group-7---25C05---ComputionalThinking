@@ -8,3 +8,6 @@ x64/
 Debug/
 Release/
 .env
+env/
+venv/
+outputs/voice_previews/

@@ -9,26 +9,31 @@ import json
 import pandas as pd
 import streamlit as st
 
-from core.config import OUTPUT_DIR, VOICE_WPM
+from core.config import OUTPUT_DIR
 from core.models import OutputFormat
 from modules.pipeline.pipeline import DEFAULT_TTS_PARAMS, STAGE_ORDER, run_pipeline
 from modules.pipeline.sample_claims import TOPIC_LABELS, get_sample_claims, topic_keys
 from modules.pipeline.ui_helpers import (MODE_COLORS, MODE_HELP, benchmark_summaries, chips_html, codes_html,
                                          criteria_checks, legend_html, result_summary, scene_rows,
-                                         timeline_bar_html, voice_rows)
+                                         timeline_bar_html, voice_caption, voice_info, voice_library_rows,
+                                         voice_option_label, voice_rows)
+from modules.providers import edge_tts_provider as tts_engine
 from modules.providers.mock_tts import MockTTS
 from modules.router.router import Request
 from modules.timeline_assembler.export import timeline_to_dict
+from modules.voice_library.library import (LANGUAGES, SPEED_MAX, SPEED_MIN, VoiceLibraryError, builtin_library,
+                                           load_library)
 
 CUSTOM = "(write your own)"
 EXAMPLES = ["Make a 90-second infographic video about sleep",
             "Make a 60-second infographic video about inflation",
             "Make an infographic or animation video about sleep",
             "Make a 300-second video about sleep",
-            "Make a 90-second infographic video about sleep with a budget of 16 credits"]
+            "Make a 90-second infographic video about sleep with a budget of 16 credits",
+            "Tạo video infographic 90 giây về giấc ngủ"]
 EXAMPLE_HINTS = {EXAMPLES[0]: "happy path", EXAMPLES[1]: "may fail S12 (too short)",
                  EXAMPLES[2]: "Router asks which format", EXAMPLES[3]: "Router rejects (> 120 s)",
-                 EXAMPLES[4]: "budget too small"}
+                 EXAMPLES[4]: "budget too small", EXAMPLES[5]: "Vietnamese request: also pick Tiếng Việt narration"}
 
 st.set_page_config(page_title="StoryFrame Studio – pipeline demo", page_icon="🎬", layout="wide")
 
@@ -43,6 +48,13 @@ def _on_example():
         st.session_state["req_text"] = chosen
 
 
+# ------------------------------------------------------------------ voice library
+try:
+    LIB = load_library()                 # built-in voices + data/voice_library.json when it exists
+    LIB_ERROR = None
+except VoiceLibraryError as exc:         # a broken team file must be visible, not silently ignored
+    LIB, LIB_ERROR = builtin_library(), str(exc)
+
 # ------------------------------------------------------------------ sidebar
 with st.sidebar:
     st.header("1 · Request")
@@ -52,10 +64,43 @@ with st.sidebar:
                         placeholder="Make a 90-second infographic video about sleep")
     n_words = len(text.split())
     st.caption(f"{n_words:,} / 1,500 words" + ("  ⚠️ over the limit, the Router will reject it" if n_words > 1500 else ""))
-    topic = st.selectbox("Claim fixture pack", topic_keys(), format_func=TOPIC_LABELS.get,
+    language = st.radio("Narration language", LIB.languages(), format_func=LANGUAGES.get, horizontal=True,
+                        help="Chooses the claim packs and the voices on offer: the voice must speak the narration's language.")
+    topic = st.selectbox("Claim fixture pack", topic_keys(language), format_func=TOPIC_LABELS.get,
+                         key=f"pack_{language}",
                          help="Hand-written claims that stand in for the REASON step (not built yet).")
 
-    st.header("2 · Options")
+    st.header("2 · Voice")
+    if LIB_ERROR:
+        st.error(f"data/voice_library.json was not loaded, built-in voices only: {LIB_ERROR}")
+    voice_ids = [v.voice_id for v in LIB.list(language=language)]
+    voice_id = st.selectbox("Voice", voice_ids, key=f"voice_{language}",
+                            index=voice_ids.index(LIB.default(language).voice_id),
+                            format_func=lambda i: voice_option_label(LIB.get(i)))
+    voice = LIB.get(voice_id)
+    speed = st.slider("Speaking speed", SPEED_MIN, SPEED_MAX, 1.0, 0.05, format="%.2fx",
+                      help="1.00x = the voice's normal pace. The planner sizes the script for this speed.")
+    st.caption(voice_caption(voice, speed))
+    if tts_engine.is_available():
+        if st.button("🔊 Hear this voice"):
+            try:
+                with st.spinner("Asking the TTS service…"):
+                    audio_path = tts_engine.synthesize_preview(voice, speed)
+                st.session_state["preview"] = (voice.voice_id, round(speed, 2), audio_path.read_bytes())
+            except tts_engine.TTSUnavailable as exc:
+                st.session_state.pop("preview", None)
+                st.warning(str(exc))
+        preview = st.session_state.get("preview")
+        if preview and preview[:2] == (voice.voice_id, round(speed, 2)):
+            st.audio(preview[2], format="audio/mp3")
+        st.caption("A preview sends one fixed public sample sentence to an online TTS service; "
+                   "your request text is never sent.")
+    else:
+        st.caption("Voice preview needs `pip install edge-tts` and internet. The pipeline works without it.")
+    with st.expander("Voice library"):
+        st.dataframe(voice_library_rows(LIB), hide_index=True)
+
+    st.header("3 · Options")
     fmt = st.selectbox("Format", ["auto"] + [f.value for f in OutputFormat],
                        help="auto = read it from the request, or default to INFOGRAPHIC.")
     t_target = st.number_input("Duration (s)", 0, 600, 0, step=5, help="0 = read it from the request (default 90 s).")
@@ -68,8 +113,11 @@ with st.sidebar:
         opt_algo = st.selectbox("Optimizer", ["v2_dp_motion_state", "v1_dp_post_check", "v0_greedy_upgrade"])
         voice_algo = st.selectbox("Voice Segmenter", ["F4_dp_share", "F3_dp_band", "F2_dp_deviation", "F1_greedy"])
     with st.expander("Simulated TTS"):
-        wpm = st.slider("True speed (words/min)", 100, 220, int(DEFAULT_TTS_PARAMS["true_wpm"]), 5,
-                        help=f"The planner assumes {VOICE_WPM:.0f} wpm; move this to see the timeline checks fail.")
+        planned_wpm = voice.planning_wpm(speed)
+        wpm = st.slider("True speed (words/min)", 100, max(220, int(planned_wpm * 1.5)), int(round(planned_wpm)), 5,
+                        key=f"true_wpm_{voice.voice_id}_{speed:.2f}",
+                        help=f"The planner assumes {planned_wpm:.0f} wpm for {voice.name}; "
+                             "move this to see the timeline checks fail.")
         pause = st.slider("Pause per sentence (s)", 0.0, 1.0, DEFAULT_TTS_PARAMS["pause_s"], 0.05)
 
     run_btn = st.button("▶ Run pipeline", type="primary", disabled=not text.strip())
@@ -84,7 +132,8 @@ st.markdown('<span style="display:inline-block;padding:2px 10px;border-radius:12
             'border:1px solid #e08a1e;color:#e08a1e;font-size:12px;font-weight:600">SIMULATED INPUTS</span> '
             '<span style="font-size:14px;opacity:.8">claims are hand-written fixtures and narration time comes '
             'from <code>MockTTS</code>; no video file is produced yet.</span>', unsafe_allow_html=True)
-st.caption("Router → Scene Segmenter → Budget Optimizer → Voice Segmenter → Timeline Assembler")
+st.caption("Router → Scene Segmenter → Budget Optimizer → Voice Segmenter → Timeline Assembler"
+           f"  ·  voice: {voice.name} ({LANGUAGES[language]})")
 
 if not st.session_state.get("ran"):
     st.info("Pick an example or type a request in the sidebar, then press **▶ Run pipeline**.")
@@ -108,7 +157,7 @@ request = Request(topic=text, output_format=None if fmt == "auto" else OutputFor
 tts = MockTTS(**{**DEFAULT_TTS_PARAMS, "true_wpm": float(wpm), "pause_s": float(pause)})
 res = run_pipeline(request, get_sample_claims(topic), router_algorithm=router_algo,
                    selection_algorithm=select_algo, optimizer_algorithm=opt_algo,
-                   voice_algorithm=voice_algo, tts=tts)
+                   voice_algorithm=voice_algo, tts=tts, voice=voice, voice_speed=float(speed))
 
 # ---- banner, stage tracker, criteria
 if res.ok:
@@ -195,6 +244,8 @@ with tab_voice:
     if not vrows:
         st.write("No voice units: the run stopped earlier.")
     else:
+        if res.voice_profile is not None:
+            st.info(voice_info(res))
         v1, v2 = st.columns(2)
         v1.metric("Units in the 10–12 s band (S19, estimated)", f"{res.voice_in_band_share:.0%}",
                   help="Computed on estimated durations; the real S19 needs a measured TTS.")

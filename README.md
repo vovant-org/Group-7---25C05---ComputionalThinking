@@ -1,14 +1,16 @@
 # StoryFrame Studio – Group 7 (CSC10014 Computational Thinking, 2026)
 
 ## Run
-    pip install pytest
+    pip install -r requirements.txt             # use a virtual environment; do not commit env/
     python -m pytest -q                         # unit + regression tests
     python -m evaluation.budget_benchmark       # -> outputs/budget_benchmark.csv
     python -m evaluation.router_benchmark       # -> outputs/router_benchmark.csv
     python -m evaluation.voice_benchmark        # -> outputs/voice_benchmark.csv (simulated TTS)
     python -m evaluation.scene_benchmark        # -> outputs/scene_benchmark.csv
     python -m modules.pipeline.cli "Make a 90-second infographic video about sleep" --topic sleep
-    pip install -r requirements.txt && streamlit run app.py   # Lab04 demo page
+    python -m modules.pipeline.cli "Tạo video infographic 90 giây về giấc ngủ" --topic sleep_vi --voice vi-hoaimy
+    python -m modules.voice_library.cli [--language vi] [--check]   # list voices / verify them on the TTS engine
+    streamlit run app.py                        # Lab04 demo page (language + voice picker in the sidebar)
     python -m evaluation.measure_tts --make-manifest   # real TTS measurement workflow, see docs/team-brief-next-steps.md
 
 ## Status
@@ -20,6 +22,7 @@
 | modules/voice_segmenter | F1-F4 + post-TTS repair + tests + benchmark on simulated TTS (docs/iteration-log-voice.md) |
 | modules/scene_segmenter | D1 greedy, D2 MMR, D2f MMR + facet, scenes/layouts (docs/iteration-log-scene.md) |
 | timeline_assembler | v0: S12/S13 checks (pure function) |
+| modules/voice_library + providers/edge_tts_provider | 8 EN/VI voices, speaking-speed choice, language check, optional preview (docs/voice-library.md); speaking rates still ASSUMED |
 | modules/pipeline + app.py | Lab04 feature: Router → Scene → Budget → Voice → Timeline, CLI + Streamlit (specs/001-pipeline-demo/) |
 | narration script generator, real providers, REASON step | TODO |
 

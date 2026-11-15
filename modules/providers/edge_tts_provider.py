@@ -4,6 +4,12 @@ Purpose: let a user hear a voice before choosing it. This module is NOT needed t
 pipeline: without `edge-tts` (or without internet) every function raises `TTSUnavailable` with a
 clear message and the rest of the app keeps working.
 
+Two sources of preview audio, in this order:
+  1. BUNDLED samples `assets/voice_previews/<voice_id>.mp3` (normal speed only). One teammate with
+     internet runs `python -m modules.voice_library.cli --make-previews` and commits them, after which
+     every machine can listen offline, without `edge-tts`.
+  2. LIVE synthesis through `edge-tts` (any speed), cached in `outputs/voice_previews/`.
+
 Privacy (report R7, AI tool policy): `edge-tts` sends the text to an online Microsoft service.
 Previews therefore use only the fixed public sample sentences of `voice_library.SAMPLE_TEXT`;
 the UI never sends user-typed text here.
@@ -22,10 +28,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from core.config import OUTPUT_DIR
+import shutil
+
+from core.config import OUTPUT_DIR, PROJECT_ROOT
 from modules.voice_library.library import ENGINE_EDGE, SAMPLE_TEXT, VoiceLibrary, VoiceProfile, check_speed
 
-PREVIEW_DIR = OUTPUT_DIR / "voice_previews"      # git-ignored cache of preview audio
+PREVIEW_DIR = OUTPUT_DIR / "voice_previews"      # git-ignored cache of live previews
+BUNDLED_DIR = PROJECT_ROOT / "assets" / "voice_previews"   # committed samples, one per voice
 TIMEOUT_S = 25.0                                 # report R7: a timeout, then a clear failure
 
 
@@ -48,10 +57,10 @@ def rate_string(speed: float) -> str:
     return f"{round((check_speed(speed) - 1.0) * 100):+d}%"
 
 
-def preview_path(voice: VoiceProfile, text: str, speed: float = 1.0, out_dir: Path = PREVIEW_DIR) -> Path:
+def preview_path(voice: VoiceProfile, text: str, speed: float = 1.0, out_dir: Optional[Path] = None) -> Path:
     """Deterministic cache file name: the same voice, text and speed always map to the same file."""
     key = f"{voice.engine_voice}|{rate_string(speed)}|{text}"
-    return Path(out_dir) / f"{voice.voice_id}-{hashlib.sha1(key.encode('utf-8')).hexdigest()[:10]}.mp3"
+    return Path(out_dir or PREVIEW_DIR) / f"{voice.voice_id}-{hashlib.sha1(key.encode('utf-8')).hexdigest()[:10]}.mp3"
 
 
 def _require_package():
@@ -84,7 +93,7 @@ def _run(make_coro):
 
 
 def synthesize_preview(voice: VoiceProfile, speed: float = 1.0, text: Optional[str] = None,
-                       out_dir: Path = PREVIEW_DIR) -> Path:
+                       out_dir: Optional[Path] = None) -> Path:
     """Audio file (mp3) of `voice` reading a sample sentence. Cached: a repeat call is free."""
     if voice.engine != ENGINE_EDGE:
         raise ValueError(f"voice {voice.voice_id} uses engine {voice.engine!r}, not {ENGINE_EDGE!r}")
@@ -125,3 +134,43 @@ def verify_library(lib: VoiceLibrary) -> VerifyResult:
     mine = [v for v in lib if v.engine == ENGINE_EDGE]
     return VerifyResult(ok=[v.voice_id for v in mine if v.engine_voice in available],
                         missing=[v.voice_id for v in mine if v.engine_voice not in available])
+
+
+# ------------------------------------------------------------------ bundled samples and the single entry point
+def bundled_path(voice: VoiceProfile, bundled_dir: Optional[Path] = None) -> Path:
+    return Path(bundled_dir or BUNDLED_DIR) / f"{voice.voice_id}.mp3"
+
+
+def has_bundled(voice: VoiceProfile, bundled_dir: Optional[Path] = None) -> bool:
+    p = bundled_path(voice, bundled_dir)
+    return p.exists() and p.stat().st_size > 0
+
+
+def can_preview(voice: VoiceProfile, speed: float = 1.0, bundled_dir: Optional[Path] = None) -> bool:
+    """True when `get_preview` has a chance: a bundled sample at normal speed, or the live engine."""
+    return (speed == 1.0 and has_bundled(voice, bundled_dir)) or (voice.engine == ENGINE_EDGE and is_available())
+
+
+def get_preview(voice: VoiceProfile, speed: float = 1.0, bundled_dir: Optional[Path] = None,
+                out_dir: Optional[Path] = None) -> Path:
+    """Audio file to play for `voice`: the bundled sample at normal speed, otherwise live synthesis.
+    Raises TTSUnavailable when neither is possible."""
+    check_speed(speed)
+    if speed == 1.0 and has_bundled(voice, bundled_dir):
+        return bundled_path(voice, bundled_dir)
+    return synthesize_preview(voice, speed, out_dir=out_dir)
+
+
+def make_bundled_previews(lib: VoiceLibrary, bundled_dir: Optional[Path] = None, force: bool = False,
+                          out_dir: Optional[Path] = None) -> list[Path]:
+    """Create (or, with force, refresh) the committed sample of every edge-tts voice. Needs internet.
+    Returns the files written; voices that already have a sample are skipped unless `force`."""
+    written = []
+    Path(bundled_dir or BUNDLED_DIR).mkdir(parents=True, exist_ok=True)
+    for v in lib:
+        if v.engine != ENGINE_EDGE or (has_bundled(v, bundled_dir) and not force):
+            continue
+        target = bundled_path(v, bundled_dir)
+        shutil.copyfile(synthesize_preview(v, 1.0, out_dir=out_dir), target)
+        written.append(target)
+    return written

@@ -3,6 +3,8 @@
     python -m modules.voice_library.cli                    # every voice
     python -m modules.voice_library.cli --language vi      # Vietnamese voices only
     python -m modules.voice_library.cli --check            # needs internet + `pip install edge-tts`
+    python -m modules.voice_library.cli --make-previews    # one sample per voice into assets/voice_previews/
+                                                           # (needs internet + edge-tts; then commit them)
 """
 from __future__ import annotations
 
@@ -29,9 +31,21 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--language", choices=sorted(LANGUAGES), default=None)
     ap.add_argument("--check", action="store_true", help="verify every voice exists on the TTS engine (online)")
+    ap.add_argument("--make-previews", action="store_true",
+                    help="create the bundled sample of every voice that has none (online)")
+    ap.add_argument("--force", action="store_true", help="with --make-previews: recreate existing samples")
     args = ap.parse_args(argv)
     lib = load_library()
     print(format_table(lib, args.language))
+    if args.make_previews:
+        from modules.providers.edge_tts_provider import BUNDLED_DIR, TTSUnavailable, has_bundled, make_bundled_previews
+        try:
+            made = make_bundled_previews(lib, force=args.force)
+        except TTSUnavailable as exc:
+            print(f"\nno previews made: {exc}")
+            return 2
+        print(f"\nwrote {len(made)} sample(s) to {BUNDLED_DIR}; "
+              f"voices with a bundled sample: {sum(has_bundled(v) for v in lib)}/{len(lib)}. Commit the folder.")
     if not args.check:
         return 0
     from modules.providers.edge_tts_provider import TTSUnavailable, verify_library

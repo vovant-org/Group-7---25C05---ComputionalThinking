@@ -154,3 +154,113 @@ def test_verify_without_the_package_raises_tts_unavailable(monkeypatch):
     monkeypatch.setattr(tts, "is_available", lambda: False)
     with pytest.raises(tts.TTSUnavailable):
         tts.verify_library(builtin_library())
+
+
+# ------------------------------------------------------------------ bundled samples and get_preview
+HOAIMY = builtin_library().get("vi-hoaimy")
+
+
+@pytest.fixture
+def dirs(tmp_path, monkeypatch):
+    """Redirect the default folders so nothing is written into the real repo."""
+    monkeypatch.setattr(tts, "BUNDLED_DIR", tmp_path / "bundled")
+    monkeypatch.setattr(tts, "PREVIEW_DIR", tmp_path / "cache")
+    return tmp_path
+
+
+def put_bundled(voice, data=b"BUNDLED"):
+    path = tts.bundled_path(voice)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return path
+
+
+def test_bundled_path_is_named_after_the_voice_id(dirs):
+    assert tts.bundled_path(ARIA) == dirs / "bundled" / "en-aria.mp3"
+
+
+def test_has_bundled_needs_a_non_empty_file(dirs):
+    assert not tts.has_bundled(ARIA)
+    put_bundled(ARIA, b"")
+    assert not tts.has_bundled(ARIA)
+    put_bundled(ARIA)
+    assert tts.has_bundled(ARIA)
+
+
+def test_bundled_sample_plays_offline_without_the_package(dirs, monkeypatch):
+    monkeypatch.setattr(tts, "is_available", lambda: False)
+    put_bundled(ARIA)
+    assert tts.can_preview(ARIA, 1.0)
+    assert tts.get_preview(ARIA, 1.0).read_bytes() == b"BUNDLED"
+
+
+def test_bundled_sample_is_only_for_normal_speed(dirs, monkeypatch):
+    monkeypatch.setattr(tts, "is_available", lambda: False)
+    put_bundled(ARIA)
+    assert not tts.can_preview(ARIA, 1.1)
+    with pytest.raises(tts.TTSUnavailable):
+        tts.get_preview(ARIA, 1.1)
+
+
+def test_other_speeds_use_live_synthesis_when_available(dirs, fake):
+    put_bundled(ARIA)
+    assert tts.can_preview(ARIA, 1.1)
+    assert tts.get_preview(ARIA, 1.1).read_bytes() == AUDIO
+    assert fake.calls[0][2] == "+10%"
+
+
+def test_no_sample_and_no_engine_means_no_preview(dirs, monkeypatch):
+    monkeypatch.setattr(tts, "is_available", lambda: False)
+    assert not tts.can_preview(HOAIMY, 1.0)
+    with pytest.raises(tts.TTSUnavailable, match="pip install edge-tts"):
+        tts.get_preview(HOAIMY, 1.0)
+
+
+def test_bundled_sample_wins_over_live_synthesis_at_normal_speed(dirs, fake):
+    put_bundled(ARIA)
+    assert tts.get_preview(ARIA, 1.0).read_bytes() == b"BUNDLED" and fake.calls == []
+
+
+def test_get_preview_rejects_a_speed_outside_the_library_range(dirs, fake):
+    with pytest.raises(ValueError):
+        tts.get_preview(ARIA, 2.0)
+
+
+def test_make_bundled_previews_creates_one_sample_per_voice_and_skips_existing(dirs, fake):
+    lib = builtin_library()
+    put_bundled(ARIA)                                                    # already there: must be kept
+    written = tts.make_bundled_previews(lib)
+    assert {p.name for p in written} == {f"{v.voice_id}.mp3" for v in lib if v.voice_id != "en-aria"}
+    assert all(p.read_bytes() == AUDIO for p in written)
+    assert tts.bundled_path(ARIA).read_bytes() == b"BUNDLED"
+    assert all(tts.has_bundled(v) for v in lib)
+    assert len(fake.calls) == len(lib) - 1                              # one request per missing voice
+
+
+def test_make_bundled_previews_force_refreshes_everything(dirs, fake):
+    lib = builtin_library()
+    put_bundled(ARIA)
+    assert len(tts.make_bundled_previews(lib, force=True)) == len(lib)
+    assert tts.bundled_path(ARIA).read_bytes() == AUDIO
+
+
+def test_make_bundled_previews_without_the_package_fails_clearly(dirs, monkeypatch):
+    monkeypatch.setattr(tts, "is_available", lambda: False)
+    with pytest.raises(tts.TTSUnavailable):
+        tts.make_bundled_previews(builtin_library())
+
+
+# ------------------------------------------------------------------ CLI --make-previews
+def test_cli_make_previews_writes_the_samples(dirs, fake, capsys):
+    from modules.voice_library import cli
+    assert cli.main(["--make-previews"]) == 0
+    out = capsys.readouterr().out
+    assert "wrote 8 sample(s)" in out and "8/8" in out
+    assert len(list((dirs / "bundled").glob("*.mp3"))) == 8
+
+
+def test_cli_make_previews_without_the_package_returns_2(dirs, monkeypatch, capsys):
+    from modules.voice_library import cli
+    monkeypatch.setattr(tts, "is_available", lambda: False)
+    assert cli.main(["--make-previews"]) == 2
+    assert "no previews made" in capsys.readouterr().out

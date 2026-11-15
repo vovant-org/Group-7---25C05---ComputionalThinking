@@ -6,9 +6,20 @@ language, speaking speed"), 4(e) `synthesize_voice(text, lang, wpm)`, 5.9.7 (TTS
 ## What the user can do
 - **Streamlit**: sidebar `1 · Request` → *Narration language* (English / Tiếng Việt) filters the claim packs
   and the voices; `2 · Voice` → pick a voice, set *Speaking speed* (0.75x-1.25x), open *Voice library* to see
-  every voice, press *Hear this voice* to audition it (needs `edge-tts` + internet).
+  every voice, listen to the voices before choosing (see below).
 - **CLI**: `python -m modules.pipeline.cli "<request>" --topic sleep_vi --voice vi-hoaimy --speed 1.1`
 - **List / check voices**: `python -m modules.voice_library.cli [--language vi] [--check]`
+
+## Listening before choosing
+Sidebar `2 · Voice` → **🎧 Listen to every voice**: each voice of the chosen language has **▶** (play a sample)
+and **Use** (choose it). **🔊 Hear this voice** plays the currently selected voice.
+Two audio sources, in this order:
+1. **Bundled samples** `assets/voice_previews/<voice_id>.mp3` (normal speed only). They play offline and need no
+   `edge-tts`. Create them once, on a machine with internet, then commit the folder:
+   `pip install edge-tts` then `python -m modules.voice_library.cli --make-previews` (add `--force` to redo).
+2. **Live synthesis** through `edge-tts` for any speed; cached in `outputs/voice_previews/` (git-ignored).
+Without either, the sidebar tells the user what to do. The samples are the fixed public sentences in
+`SAMPLE_TEXT` (one English, one Vietnamese); user text is never sent.
 
 ## Built-in voices
 | id | name | locale | gender |

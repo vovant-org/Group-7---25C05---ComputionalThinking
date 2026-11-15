@@ -55,6 +55,33 @@ try:
 except VoiceLibraryError as exc:         # a broken team file must be visible, not silently ignored
     LIB, LIB_ERROR = builtin_library(), str(exc)
 
+
+def _play(v, speed):
+    """Load a sample of voice `v` (bundled file, else live synthesis) into the single player slot."""
+    try:
+        with st.spinner(f"Loading {v.name}…"):
+            path = tts_engine.get_preview(v, speed)
+        st.session_state["preview"] = (v.voice_id, v.name, round(speed, 2), path.read_bytes())
+        st.session_state.pop("preview_error", None)
+    except tts_engine.TTSUnavailable as exc:
+        st.session_state.pop("preview", None)
+        st.session_state["preview_error"] = str(exc)
+
+
+def _show_player():
+    if st.session_state.get("preview_error"):
+        st.warning(st.session_state["preview_error"])
+    elif st.session_state.get("preview"):
+        _, name, spd, audio = st.session_state["preview"]
+        st.caption(f"Sample: {name} at {spd:.2f}x")
+        st.audio(audio, format="audio/mp3")
+
+
+def _use_voice(lang, voice_id):
+    """Button callback: make `voice_id` the selected voice (runs before the next rerun)."""
+    st.session_state[f"voice_{lang}"] = voice_id
+
+
 # ------------------------------------------------------------------ sidebar
 with st.sidebar:
     st.header("1 · Request")
@@ -74,29 +101,38 @@ with st.sidebar:
     if LIB_ERROR:
         st.error(f"data/voice_library.json was not loaded, built-in voices only: {LIB_ERROR}")
     voice_ids = [v.voice_id for v in LIB.list(language=language)]
+    st.session_state.setdefault(f"voice_{language}", LIB.default(language).voice_id)   # first visit: the default
     voice_id = st.selectbox("Voice", voice_ids, key=f"voice_{language}",
-                            index=voice_ids.index(LIB.default(language).voice_id),
                             format_func=lambda i: voice_option_label(LIB.get(i)))
     voice = LIB.get(voice_id)
     speed = st.slider("Speaking speed", SPEED_MIN, SPEED_MAX, 1.0, 0.05, format="%.2fx",
                       help="1.00x = the voice's normal pace. The planner sizes the script for this speed.")
     st.caption(voice_caption(voice, speed))
-    if tts_engine.is_available():
+    player = st.container()                     # one audio player; filled below, after the buttons ran
+    if tts_engine.can_preview(voice, speed):
         if st.button("🔊 Hear this voice"):
-            try:
-                with st.spinner("Asking the TTS service…"):
-                    audio_path = tts_engine.synthesize_preview(voice, speed)
-                st.session_state["preview"] = (voice.voice_id, round(speed, 2), audio_path.read_bytes())
-            except tts_engine.TTSUnavailable as exc:
-                st.session_state.pop("preview", None)
-                st.warning(str(exc))
-        preview = st.session_state.get("preview")
-        if preview and preview[:2] == (voice.voice_id, round(speed, 2)):
-            st.audio(preview[2], format="audio/mp3")
-        st.caption("A preview sends one fixed public sample sentence to an online TTS service; "
-                   "your request text is never sent.")
+            _play(voice, speed)
+    with st.expander("🎧 Listen to every voice"):
+        for v in LIB.list(language=language):
+            c_name, c_play, c_use = st.columns([3, 1, 1])
+            c_name.markdown(f"**{v.name}**  \n{v.gender}, {v.locale}")
+            if c_play.button("▶", key=f"play_{v.voice_id}", help="Play a sample",
+                             disabled=not tts_engine.can_preview(v, speed)):
+                _play(v, speed)
+            c_use.button("Use", key=f"use_{v.voice_id}", on_click=_use_voice, args=(language, v.voice_id),
+                         disabled=(v.voice_id == voice_id), help="Choose this voice")
+    with player:
+        _show_player()
+    lang_voices = LIB.list(language=language)
+    if not any(tts_engine.can_preview(v, speed) for v in lang_voices) and any(tts_engine.has_bundled(v) for v in lang_voices):
+        st.caption("Bundled samples play only at 1.00x. Set the speed to 1.00x, or run `pip install edge-tts` "
+                   "(needs internet) to hear other speeds.")
+    elif not any(tts_engine.can_preview(v, speed) for v in lang_voices):
+        st.caption("No samples to play yet. Run `pip install edge-tts` (needs internet), or ask a teammate to run "
+                   "`python -m modules.voice_library.cli --make-previews` and commit `assets/voice_previews/`.")
     else:
-        st.caption("Voice preview needs `pip install edge-tts` and internet. The pipeline works without it.")
+        st.caption("Bundled samples play offline; other speeds (or a missing sample) send one fixed public "
+                   "sentence to an online TTS service. Your request text is never sent.")
     with st.expander("Voice library"):
         st.dataframe(voice_library_rows(LIB), hide_index=True)
 

@@ -1,0 +1,8 @@
+# Extra packages for the infographic video maker (pip install -r requirements-video.txt)
+Pillow          # draws every frame (text and numbers are drawn by code)
+numpy           # frame compositing (already installed with pandas)
+imageio-ffmpeg  # bundled FFmpeg binary; not needed if `ffmpeg` is already on PATH
+
+# Optional voice engines (install only what you use)
+# pyttsx3       # offline system voice (SAPI5 on Windows). Text never leaves the PC.
+# edge-tts      # Microsoft Edge neural voices, ONLINE: sends the narration text to a Microsoft service

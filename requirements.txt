@@ -1,3 +1,4 @@
 pytest
 streamlit
 pandas
+edge-tts   # optional: only for the 'Hear this voice' preview; the app runs without it

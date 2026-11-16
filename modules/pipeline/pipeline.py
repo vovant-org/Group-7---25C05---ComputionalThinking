@@ -18,7 +18,7 @@ Without a voice the behaviour is exactly what it was before the voice library ex
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Callable, Optional, Sequence
 
@@ -130,10 +130,13 @@ def run_pipeline(request: Request, claims: Sequence[Claim], *,
                  tts: Optional[Callable[[tuple[str, ...]], float]] = None,
                  pad_s: float = 0.0,
                  voice: Optional[VoiceProfile] = None,
-                 voice_speed: float = 1.0) -> PipelineResult:
+                 voice_speed: float = 1.0,
+                 unavailable_modes: frozenset = frozenset()) -> PipelineResult:
     """Run the five stages in order and stop at the first one that fails.
 
-    `voice` / `voice_speed` come from the voice library; ValueError if the speed is out of range."""
+    `voice` / `voice_speed` come from the voice library; ValueError if the speed is out of range.
+    `unavailable_modes`: render modes that cannot be produced right now (for example CLIP while no
+    image-to-video provider is connected). The Budget Optimizer then plans without them."""
     planning_wpm = voice.planning_wpm(voice_speed) if voice is not None else VOICE_WPM
     tts = tts or MockTTS(**{**DEFAULT_TTS_PARAMS, "true_wpm": planning_wpm})
     res = PipelineResult(request=request, voice_profile=voice, voice_speed=voice_speed,
@@ -152,6 +155,9 @@ def run_pipeline(request: Request, claims: Sequence[Claim], *,
     res.stages.append(StageLog(Stage.ROUTER, True,
                                f"ACCEPT: {d.fmt.value}, {d.t_target} s, {d.word_count} input words"))
     profile = PROFILES[d.fmt]
+    if unavailable_modes:
+        profile = replace(profile, allowed_modes=tuple(m for m in profile.allowed_modes
+                                                       if m not in unavailable_modes))
 
     # Voice choice: an English voice must not read Vietnamese narration (or the other way round).
     if voice is not None:

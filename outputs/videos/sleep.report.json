@@ -1,0 +1,239 @@
+{
+  "video": "D:\\Group07\\Group_Project\\Group-7---25C05---ComputionalThinking\\outputs\\videos\\sleep.mp4",
+  "request": "Make a 90-second animated video about sleep",
+  "format": "ANIMATION",
+  "t_target": 90.0,
+  "total_s": 89.42,
+  "deviation": 0.0064,
+  "fps": 24,
+  "resolution": [
+    1280,
+    720
+  ],
+  "scenes": 12,
+  "frames": 2146,
+  "subtitle_cues": 24,
+  "voice_engine": "silent-165-0.3",
+  "voice_is_silent": true,
+  "voice_speed_factor": 1.0,
+  "pause_per_scene_s": 0.0,
+  "claims": [
+    {
+      "claim_id": "SLE01",
+      "text": "Sleep is an active process during which the brain sorts memories and clears waste built up during the day."
+    },
+    {
+      "claim_id": "SLE02",
+      "text": "The night is split into repeating cycles of light sleep, deep sleep and dream sleep, each doing different work for the body."
+    },
+    {
+      "claim_id": "SLE03",
+      "text": "Going without enough sleep makes it harder to concentrate, remember new facts and react quickly to what happens around you."
+    },
+    {
+      "claim_id": "SLE04",
+      "text": "Over months and years, regular short sleep is linked with higher risks of heart problems and weight gain."
+    },
+    {
+      "claim_id": "SLE05",
+      "text": "Keeping the same bedtime and wake-up time, even on weekends, helps the body clock settle into a steady rhythm."
+    },
+    {
+      "claim_id": "SLE06",
+      "text": "Bright screens late in the evening can delay sleepiness because light tells the brain that it is still daytime."
+    },
+    {
+      "claim_id": "SLE07",
+      "text": "A cool, dark and quiet bedroom makes it easier to fall asleep and to stay asleep through the night."
+    },
+    {
+      "claim_id": "SLE08",
+      "text": "Caffeine blocks the signals that build up sleep pressure, so a late coffee can keep you awake for hours."
+    },
+    {
+      "claim_id": "SLE09",
+      "text": "While you sleep, hormones that support growth and repair are released, which is why rest matters after hard physical effort."
+    },
+    {
+      "claim_id": "SLE11",
+      "text": "To build a better routine, first fix your wake-up time, then dim the lights early, and finally keep screens out of bed."
+    },
+    {
+      "claim_id": "SLE12",
+      "text": "Sleep problems that last for weeks, such as loud snoring with daytime exhaustion, are worth discussing with a doctor."
+    },
+    {
+      "claim_id": "SLE15",
+      "text": "Think of sleep like charging a phone overnight: skip it and you start the day running on a low battery."
+    }
+  ],
+  "adjustments": [],
+  "criteria": {
+    "S11": {
+      "pass": true,
+      "detail": "motion ratio 100%; modes LAYERED; no AI clips (CLIP unavailable)"
+    },
+    "S12": {
+      "pass": true,
+      "detail": "89.42 s (measured on the MP4)"
+    },
+    "S13": {
+      "pass": true,
+      "detail": "0.6% off the 90 s target"
+    },
+    "S15": {
+      "pass": true,
+      "detail": "not applicable: no text is drawn inside animation scenes (subtitles come from the narration)"
+    }
+  },
+  "notes": [
+    "The audio track is SILENT (SilentEngine): durations follow a words-per-minute rule.",
+    "CLIP (AI image-to-video) is not available: no provider is connected, so every scene is LAYERED cut-out animation drawn by code."
+  ],
+  "timeline": [
+    {
+      "scene": 0,
+      "start_s": 0.0,
+      "duration_s": 7.209,
+      "mode": "LAYERED",
+      "layout": "cutout:cause_effect",
+      "labels": [],
+      "narration": "Sleep is an active process during which the brain sorts memories and clears waste built up during the day.",
+      "pose": "wave",
+      "prop": "cause_effect",
+      "energy": 1.4
+    },
+    {
+      "scene": 1,
+      "start_s": 7.209,
+      "duration_s": 8.3,
+      "mode": "LAYERED",
+      "layout": "cutout:steps",
+      "labels": [],
+      "narration": "The night is split into repeating cycles of light sleep, deep sleep and dream sleep, each doing different work for the body.",
+      "pose": "point",
+      "prop": "steps",
+      "energy": 1.0
+    },
+    {
+      "scene": 2,
+      "start_s": 15.509,
+      "duration_s": 7.573,
+      "mode": "LAYERED",
+      "layout": "cutout:cause_effect",
+      "labels": [],
+      "narration": "Going without enough sleep makes it harder to concentrate, remember new facts and react quickly to what happens around you.",
+      "pose": "point",
+      "prop": "cause_effect",
+      "energy": 1.4
+    },
+    {
+      "scene": 3,
+      "start_s": 23.082,
+      "duration_s": 6.845,
+      "mode": "LAYERED",
+      "layout": "cutout:cause_effect",
+      "labels": [],
+      "narration": "Over months and years, regular short sleep is linked with higher risks of heart problems and weight gain.",
+      "pose": "point",
+      "prop": "cause_effect",
+      "energy": 1.4
+    },
+    {
+      "scene": 4,
+      "start_s": 29.927,
+      "duration_s": 7.209,
+      "mode": "LAYERED",
+      "layout": "cutout:steps",
+      "labels": [],
+      "narration": "Keeping the same bedtime and wake-up time, even on weekends, helps the body clock settle into a steady rhythm.",
+      "pose": "point",
+      "prop": "steps",
+      "energy": 1.4
+    },
+    {
+      "scene": 5,
+      "start_s": 37.136,
+      "duration_s": 7.209,
+      "mode": "LAYERED",
+      "layout": "cutout:cause_effect",
+      "labels": [],
+      "narration": "Bright screens late in the evening can delay sleepiness because light tells the brain that it is still daytime.",
+      "pose": "point",
+      "prop": "cause_effect",
+      "energy": 1.0
+    },
+    {
+      "scene": 6,
+      "start_s": 44.345,
+      "duration_s": 7.209,
+      "mode": "LAYERED",
+      "layout": "cutout:cause_effect",
+      "labels": [],
+      "narration": "A cool, dark and quiet bedroom makes it easier to fall asleep and to stay asleep through the night.",
+      "pose": "point",
+      "prop": "cause_effect",
+      "energy": 1.0
+    },
+    {
+      "scene": 7,
+      "start_s": 51.555,
+      "duration_s": 7.209,
+      "mode": "LAYERED",
+      "layout": "cutout:cause_effect",
+      "labels": [],
+      "narration": "Caffeine blocks the signals that build up sleep pressure, so a late coffee can keep you awake for hours.",
+      "pose": "point",
+      "prop": "cause_effect",
+      "energy": 1.0
+    },
+    {
+      "scene": 8,
+      "start_s": 58.764,
+      "duration_s": 7.573,
+      "mode": "LAYERED",
+      "layout": "cutout:cause_effect",
+      "labels": [],
+      "narration": "While you sleep, hormones that support growth and repair are released, which is why rest matters after hard physical effort.",
+      "pose": "point",
+      "prop": "cause_effect",
+      "energy": 1.0
+    },
+    {
+      "scene": 9,
+      "start_s": 66.336,
+      "duration_s": 8.3,
+      "mode": "LAYERED",
+      "layout": "cutout:steps",
+      "labels": [],
+      "narration": "To build a better routine, first fix your wake-up time, then dim the lights early, and finally keep screens out of bed.",
+      "pose": "point",
+      "prop": "steps",
+      "energy": 1.0
+    },
+    {
+      "scene": 10,
+      "start_s": 74.636,
+      "duration_s": 7.209,
+      "mode": "LAYERED",
+      "layout": "cutout:cause_effect",
+      "labels": [],
+      "narration": "Sleep problems that last for weeks, such as loud snoring with daytime exhaustion, are worth discussing with a doctor.",
+      "pose": "point",
+      "prop": "cause_effect",
+      "energy": 1.0
+    },
+    {
+      "scene": 11,
+      "start_s": 81.845,
+      "duration_s": 7.573,
+      "mode": "LAYERED",
+      "layout": "cutout:bulb",
+      "labels": [],
+      "narration": "Think of sleep like charging a phone overnight: skip it and you start the day running on a low battery.",
+      "pose": "think",
+      "prop": "bulb",
+      "energy": 1.4
+    }
+  ]
+}

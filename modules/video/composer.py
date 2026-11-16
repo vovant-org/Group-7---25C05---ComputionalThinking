@@ -395,7 +395,7 @@ def draw_base(st: Style, facet: str, index: int, total: int, accent: tuple) -> I
     t = np.linspace(0, 1, h, dtype=np.float32)[:, None, None]
     top, bot = np.array(st.bg_top, np.float32), np.array(st.bg_bottom, np.float32)
     arr = np.broadcast_to(top * (1 - t) + bot * t, (h, w, 3)).astype(np.uint8)
-    img = Image.fromarray(arr, "RGB")
+    img = Image.fromarray(arr)
     d = ImageDraw.Draw(img)
     d.rectangle((0, 0, int(w * (index + 1) / max(1, total)), 8), fill=accent)       # progress bar
     chip = facet.replace("_", " ").upper()

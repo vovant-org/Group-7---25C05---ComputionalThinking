@@ -1,6 +1,7 @@
-"""Make an INFOGRAPHIC video end to end.
+"""Make an INFOGRAPHIC or ANIMATION video end to end.
 
     python -m modules.video.make_video "Make a 90-second infographic video about sleep" --pack sleep
+    python -m modules.video.make_video "Make a 90-second animated video about sleep" --pack sleep
     python -m modules.video.make_video "Make a 90-second infographic video" --reference notes.txt --voice-id en-aria
 
 Flow (report Level-1 flow, REQUEST ... RESPOND):
@@ -11,11 +12,14 @@ Flow (report Level-1 flow, REQUEST ... RESPOND):
        then at most 2 adjustments: N4 pauses + N3 speed (within +-10 %) chosen together as the cheapest pair
        that satisfies every constraint, N1 re-plan for a higher rate when the script is too short, N2 drop
        claims that cannot fit. (N2 removes a scene instead of rewriting its narration.)
-  3. Infographic Composer draws every scene; labels are checked against the claims (S15).
+  3. INFOGRAPHIC: the Infographic Composer draws every scene; labels are checked against the claims (S15).
+     ANIMATION: the Motion Planner chooses pose and prop of every scene and `animation.py` builds its
+     cut-out layers (render mode LAYERED); the checks are the subtitle band and real movement (S11).
   4. FFmpeg render: visual track + voice-over track + subtitles.
   5. The finished MP4 is measured again (S12, S13) and a JSON report is written next to it.
 
-Only the INFOGRAPHIC format is built. ANIMATION and HYBRID stop with a clear message.
+INFOGRAPHIC and ANIMATION are built. HYBRID stops with a clear message. The AI image-to-video mode
+CLIP is not available (no provider is connected), so the Budget Optimizer plans ANIMATION with LAYERED only.
 """
 from __future__ import annotations
 
@@ -28,9 +32,10 @@ from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 from core.config import OUTPUT_DIR, PROFILES, VOICE_WPM
-from core.models import OutputFormat
+from core.models import MOTION_MODES, OutputFormat, RenderMode
 from modules.pipeline.pipeline import PipelineResult, PipelineStatus, run_pipeline
 from modules.router.router import Request
+from modules.video.animation import AnimatedScene, check_animation, compose_animation_scene
 from modules.video.composer import ComposedScene, Style, check_labels, compose_scene
 from modules.video.render import RenderError, probe_duration, render_video
 from modules.video.voice import (SilentEngine, SpeechEngine, VoiceError, VoiceRecorder, make_engine)
@@ -41,6 +46,7 @@ MAX_TEMPO = 1.10          # N3: never speed the voice up by more than 10 %
 MIN_TEMPO = 0.90          # N3: ... nor slow it down by more than 10 %
 MAX_PAD_S = 0.8           # N4: never add more than this pause per scene
 MAX_ADJUSTMENTS = 2
+UNAVAILABLE_MODES = frozenset({RenderMode.CLIP})   # no image-to-video provider is connected (report 5.9.10, L1)
 CALIBRATE_IF = 0.08       # re-plan when the measured speaking rate is more than 8 % off the planned one
 
 
@@ -172,7 +178,8 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
     for _ in range(max_adjustments + 2):
         recorder.tempo = state["tempo"]
         try:
-            res = run_pipeline(request, pool, tts=recorder, pad_s=state["pad"], voice=voice, voice_speed=speed)
+            res = run_pipeline(request, pool, tts=recorder, pad_s=state["pad"], voice=voice, voice_speed=speed,
+                               unavailable_modes=UNAVAILABLE_MODES)
         except (VoiceError, RuntimeError) as exc:                   # engine failure, FFmpeg missing, offline ...
             return _fail(PipelineResult(request=request), log, f"voice engine failed: {exc}")
         if res.ok or res.status != PipelineStatus.TIMELINE_CHECKS_FAILED:
@@ -195,13 +202,17 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
         return _fail(res, log, _stop_message(res) + _suggestion(res) + (" | " + "; ".join(log) if log else ""))
 
     fmt = res.decision.fmt
-    if fmt != OutputFormat.INFOGRAPHIC:
-        return _fail(res, log, f"only the INFOGRAPHIC format is built; the request resolved to {fmt.value}")
-
     total_scenes = len(res.scenes)
-    composed: dict[int, ComposedScene] = {
-        s.scene_id: compose_scene(s, s.narration, style, i, total_scenes) for i, s in enumerate(res.scenes)}
-    problems = [p for cs in composed.values() for p in check_labels(cs)]
+    if fmt == OutputFormat.INFOGRAPHIC:
+        composed: dict = {s.scene_id: compose_scene(s, s.narration, style, i, total_scenes)
+                          for i, s in enumerate(res.scenes)}
+        problems = [p for cs in composed.values() for p in check_labels(cs)]
+    elif fmt == OutputFormat.ANIMATION:
+        composed = {s.scene_id: compose_animation_scene(s, s.narration, style, i, total_scenes)
+                    for i, s in enumerate(res.scenes)}
+        problems = [p for cs in composed.values() for p in check_animation(cs, style)]
+    else:
+        return _fail(res, log, f"only INFOGRAPHIC and ANIMATION are built; the request resolved to {fmt.value}")
 
     render_info: dict = {}
     measured_s: Optional[float] = None
@@ -221,30 +232,41 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
     return VideoResult(True, out_path if render else None, res, report, log)
 
 
-def build_report(res: PipelineResult, composed: dict[int, ComposedScene], problems: list[str],
+def build_report(res: PipelineResult, composed: dict, problems: list[str],
                  engine: SpeechEngine, state: dict, log: list[str], style: Style, fps: int,
                  measured_s: Optional[float], render_info: dict, path: Optional[Path]) -> dict:
     tl, target = res.timeline, res.timeline.t_target
     total = measured_s if measured_s is not None else tl.total_s
     dev = abs(total - target) / target
+    fmt = res.decision.fmt
+    animation = fmt == OutputFormat.ANIMATION
     modes = [e.render_mode.value for e in tl.entries]
-    allowed = {m.value for m in PROFILES[OutputFormat.INFOGRAPHIC].allowed_modes}
+    allowed = {m.value for m in PROFILES[fmt].allowed_modes}
     min_font = min((cs.min_font_used for cs in composed.values()), default=0)
     silent = isinstance(engine, SilentEngine)
 
     def chk(ok: bool, detail: str) -> dict:
         return {"pass": bool(ok), "detail": detail}
 
+    if animation:                                   # every scene has motion (min_motion_ratio 1.0) and nothing is a still
+        motion = sum(m in {x.value for x in MOTION_MODES} for m in modes) / max(1, len(modes))
+        s11 = chk(set(modes) <= allowed and motion >= PROFILES[fmt].min_motion_ratio - 1e-9 and not problems,
+                  f"motion ratio {motion:.0%}; modes " + ", ".join(sorted(set(modes))) + "; no AI clips (CLIP unavailable)")
+        s15 = chk(not problems, "not applicable: no text is drawn inside animation scenes (subtitles come from the narration)"
+                  if not problems else "; ".join(problems))
+    else:
+        s11 = chk(set(modes) <= allowed and "CLIP" not in modes, "no AI clips; modes " + ", ".join(sorted(set(modes))))
+        s15 = chk(not problems and min_font >= style.min_font,
+                  f"every label comes from its claim; smallest font {min_font}px (limit {style.min_font}px, assumed)"
+                  if not problems else "; ".join(problems))
     criteria = {
-        "S11": chk(set(modes) <= allowed and "CLIP" not in modes, "no AI clips; modes " + ", ".join(sorted(set(modes)))),
+        "S11": s11,
         "S12": chk(60 <= total <= 120, f"{total:.2f} s " + ("(measured on the MP4)" if measured_s else "(from the timeline)")),
         "S13": chk(dev <= TOLERANCE + 1e-9, f"{dev:.1%} off the {target:.0f} s target"),
-        "S15": chk(not problems and min_font >= style.min_font,
-                   f"every label comes from its claim; smallest font {min_font}px (limit {style.min_font}px, assumed)"
-                   if not problems else "; ".join(problems)),
+        "S15": s15,
     }
     return {
-        "video": str(path) if path else None, "request": res.request.topic, "format": "INFOGRAPHIC",
+        "video": str(path) if path else None, "request": res.request.topic, "format": fmt.value,
         "t_target": target, "total_s": round(total, 3), "deviation": round(dev, 4), "fps": fps,
         "resolution": list(style.size), "scenes": len(tl.entries), "frames": render_info.get("frames"),
         "subtitle_cues": render_info.get("cues"), "voice_engine": engine.name,
@@ -252,10 +274,14 @@ def build_report(res: PipelineResult, composed: dict[int, ComposedScene], proble
         "claims": [{"claim_id": c.claim_id, "text": c.text} for c in res.selection.claims],
         "adjustments": log, "criteria": criteria,
         "notes": (["The audio track is SILENT (SilentEngine): durations follow a words-per-minute rule."] if silent else [])
+                 + (["CLIP (AI image-to-video) is not available: no provider is connected, so every scene is LAYERED "
+                     "cut-out animation drawn by code."] if animation else [])
                  + [w for cs in composed.values() for w in cs.warnings],
         "timeline": [{"scene": e.scene_id, "start_s": round(e.start_s, 3), "duration_s": round(e.duration_s, 3),
                       "mode": e.render_mode.value, "layout": composed[e.scene_id].layout,
-                      "labels": [l.text for l in composed[e.scene_id].labels], "narration": e.narration}
+                      "labels": [l.text for l in composed[e.scene_id].labels], "narration": e.narration,
+                      **({"pose": composed[e.scene_id].plan.pose, "prop": composed[e.scene_id].plan.prop,
+                          "energy": composed[e.scene_id].plan.energy} if animation else {})}
                      for e in tl.entries],
     }
 
@@ -266,7 +292,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     from modules.video.claims import claims_from_text
     from modules.voice_library.library import load_library
 
-    ap = argparse.ArgumentParser(description="Make an INFOGRAPHIC video (MP4 with voice-over and subtitles).")
+    ap = argparse.ArgumentParser(description="Make an INFOGRAPHIC or ANIMATION video (MP4 with voice-over and subtitles).")
     ap.add_argument("request", help='e.g. "Make a 90-second infographic video about sleep"')
     src = ap.add_mutually_exclusive_group()
     src.add_argument("--pack", choices=topic_keys(), help="hand-written claim pack of the demo")

@@ -51,6 +51,16 @@ Rules for this file
 |---|---|---|
 | Vũ Thành Nam | Wrote Timeline Assembler v0 (`assemble()`, `Timeline`, `TimelineEntry`): scenes placed by audio duration, S12/S13 checks, 21 tests. Ran `py -m pytest -q`: 224 passed. PR #1 merged by Võ Văn Thiện. | PR #1, commit `a33a6b3` "Timeline Assembler v0: S12/S13 checks, 21 tests (224 pass)", PR #1, merged as `4671254` |
 
+### 2026-11-16 (Mon)
+| Who | What | Evidence |
+|---|---|---|
+| Vũ Thành Nam | ANIMATION format end to end: Motion Planner (modules/video/motion_planner.py), cut-out keyframe animation (modules/video/animation.py), format-aware make_video/render, option to exclude unavailable render modes in run_pipeline. CLIP is not built, so every scene is LAYERED. | 56 tests in tests/test_animation.py; 90 s demo video: S11 100%, S12 89.42 s, S13 0.6% off target. PR merged. |
+
+### 2026-11-17 (Tue)
+| Who | What | Evidence |
+|---|---|---|
+| Vũ Thành Nam | Video page UI: format choice (Auto/Infographic/Animation), example requests, headline metrics, tabs Video/Scenes/Checks/Report; balanced subtitle line breaks (no one-word last line); .gitignore for generated videos. | 12 tests in tests/test_video_ui.py; full suite 443 passed; PR feat/nam-ui. |
+
 ### Tasks assigned to the team (to be filled in by each member)
 
 | Who | Task | Evidence |
@@ -107,6 +117,8 @@ Policy reminder: AI output is not evidence by itself; every result below comes f
 | 2026-11-03 | Claude | `ai-assistant-prompt.md` (mentor prompt and per-member task blocks) | Nam read the rules and the file references; it will be validated when teammates use it. Commit `3624ef0`. |
 | 2026-11-03 | Claude | Scene Segmenter (D1/D2/D2f, scenes and layouts), hand-written cases, `scene_benchmark.py`, tests, `iteration-log-scene.md` | **[conditional]** Nam ran `py -m pytest -q` (203 passed) and `py -m evaluation.scene_benchmark`; numbers matched. The benchmark data is synthetic (an assumption) and the two hand-written cases were labelled by the AI; the team must review them and add its own hard cases. Commit `09ad369`. |
 | 2026-11-04 | Claude | Draft of `assembler.py`, `Timeline`/`TimelineEntry` in `core/models.py`, `test_timeline_assembler.py` | Nam ran `py -m pytest -q` (224 passed). Known caveats: `pad_s` = 0.0 is an assumption (TTS pause not measured); each scene is voiced separately, which may not match the 10-12 s voice units. No benchmark yet (single version, simulated audio). PR #1, commit `a33a6b3`. |
+| 2026-11-16 | Claude | Drafted the Motion Planner, the animation module and the make_video changes; wrote the tests. | Read the code and ran the full test suite on my machine (431 passed); generated and watched the demo video; checked S11/S12/S13/S15 on the finished MP4. |
+| 2026-11-17 | Claude | Drafted the new video page, ui_helpers additions and the subtitle balancing; wrote the UI tests. | Ran py -m pytest (443 passed after merging main); started the Streamlit app, made an animation video and checked all four tabs by eye. |
 
 Things the AI got wrong or overstated, found during review (keep this list honest):
 - It said Python 3.10+ was required; the code runs on Python 3.9 (confirmed on the team machine).

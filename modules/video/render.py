@@ -1,4 +1,6 @@
-"""Renders the INFOGRAPHIC video: frames drawn by code, piped to FFmpeg with the audio track.
+"""Renders the video: frames drawn by code, piped to FFmpeg with the audio track.
+INFOGRAPHIC scenes use `SceneRenderer` below; ANIMATION scenes use the cut-out `LayerRenderer`
+(modules/video/animation.py). Both give `frame(t)` and `dur`, so the rest of the loop is shared.
 
 Render modes of the infographic profile (report 4(b)):
   STATIC  the finished frame, no motion
@@ -115,8 +117,13 @@ def render_video(timeline, composed: Mapping[int, ComposedScene], recorder: Voic
     srt_path = out_path.with_suffix(".srt")
     srt_path.write_text(to_srt(cues), encoding="utf-8")
 
-    renderers = [SceneRenderer(composed[e.scene_id], e.render_mode.value, e.duration_s, e.audio_duration_s, i, st)
-                 for i, e in enumerate(entries)]
+    renderers = []
+    for i, e in enumerate(entries):
+        cs = composed[e.scene_id]
+        if hasattr(cs, "make_renderer"):                   # ANIMATION: cut-out layers (modules/video/animation.py)
+            renderers.append(cs.make_renderer(e.duration_s, e.audio_duration_s, i, st))
+        else:                                              # INFOGRAPHIC: STATIC / PAN / REVEAL
+            renderers.append(SceneRenderer(cs, e.render_mode.value, e.duration_s, e.audio_duration_s, i, st))
     starts = [int(round(e.start_s * fps)) for e in entries] + [n_total]
     bands: dict[str, tuple[np.ndarray, np.ndarray]] = {}
 

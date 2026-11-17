@@ -158,7 +158,7 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
                output_format: Optional[OutputFormat] = None, fps: int = 24, burn_subtitles: bool = True,
                soft_subtitles: bool = True, render: bool = True, work_dir: Optional[Path] = None,
                style: Style = Style(), progress: Optional[Callable[[float, str], None]] = None,
-               max_adjustments: int = MAX_ADJUSTMENTS) -> VideoResult:
+               max_adjustments: int = MAX_ADJUSTMENTS, visual_engine: bool = True) -> VideoResult:
     out_path = Path(out_path)
     if work_dir is None:                                  # dry run: scratch space only, nothing left behind
         work_dir = out_path.parent / (out_path.stem + "_work") if render else Path(tempfile.mkdtemp(prefix="sfs_"))
@@ -208,8 +208,13 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
                           for i, s in enumerate(res.scenes)}
         problems = [p for cs in composed.values() for p in check_labels(cs)]
     elif fmt == OutputFormat.ANIMATION:
-        composed = {s.scene_id: compose_animation_scene(s, s.narration, style, i, total_scenes)
-                    for i, s in enumerate(res.scenes)}
+        if visual_engine:                           # Topic-aware Visual Engine: objects and motion follow the content
+            from modules.visual_engine import analyse_topic, compose_topic_scenes
+            profile = analyse_topic(request_text, [c.text for c in res.selection.claims])
+            composed = compose_topic_scenes(res.scenes, profile, style)
+        else:                                       # generic stick figure + six props
+            composed = {s.scene_id: compose_animation_scene(s, s.narration, style, i, total_scenes)
+                        for i, s in enumerate(res.scenes)}
         problems = [p for cs in composed.values() for p in check_animation(cs, style)]
     else:
         return _fail(res, log, f"only INFOGRAPHIC and ANIMATION are built; the request resolved to {fmt.value}")
@@ -226,6 +231,18 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
 
     report = build_report(res, composed, problems, engine, state, log, style, fps, measured_s, render_info,
                           out_path if render else None)
+    if fmt == OutputFormat.ANIMATION and visual_engine:
+        from modules.visual_engine.quality import run_quality
+        q = run_quality(composed, res.timeline, style, t_target=res.timeline.t_target, video=out_path if render else None,
+                        measured_s=measured_s, silent_engine=isinstance(engine, SilentEngine))
+        report["visual_engine"] = {
+            "domain": profile.domain, "audience": profile.audience, "concepts": list(profile.concepts[:8]),
+            "relations": sorted({r.verb for r in profile.relations}), "trend": profile.trend,
+            "scenes": [{"scene": e.scene_id, "objects": list(composed[e.scene_id].objects),
+                        "sync": composed[e.scene_id].sync_log} for e in res.timeline.entries],
+            "quality": q.as_dict()}
+        if not q.ok:
+            report["notes"] = report.get("notes", []) + ["Visual quality: " + "; ".join(q.problems[:4])]
     if render:
         out_path.with_suffix(".report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2),
                                                         encoding="utf-8")
@@ -307,6 +324,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--no-soft-subs", action="store_true", help="do not add the soft subtitle track")
     ap.add_argument("--fps", type=int, default=24)
     ap.add_argument("--dry-run", action="store_true", help="plan, compose and check everything but write no video")
+    ap.add_argument("--no-visual-engine", action="store_true", help="ANIMATION: use the generic stick-figure animation")
     a = ap.parse_args(argv)
 
     reference = a.reference.read_text(encoding="utf-8") if a.reference else ""
@@ -342,7 +360,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     r = make_video(a.request, claims, out, engine=engine, voice=voice, speed=a.speed, reference_text=reference,
                    fps=a.fps, burn_subtitles=not a.no_burn, soft_subtitles=not a.no_soft_subs,
-                   render=not a.dry_run, progress=show)
+                   render=not a.dry_run, progress=show, visual_engine=not a.no_visual_engine)
     print()
     for line in r.log:
         print("  adjust:", line)

@@ -107,6 +107,8 @@ with st.sidebar:
 
     st.header("3 · Options")
     burn = st.checkbox("Burn subtitles into the picture", True)
+    topic_engine = st.checkbox("Topic-aware visuals (animation): objects and motion follow the topic", True,
+                               help="Animation only. Off = the generic stick figure with six standard props.")
     go = st.button("🎬 Create video", type="primary", use_container_width=True,
                    disabled=not FFMPEG_OK or not request_text.strip())
     st.caption("Takes about 30–60 s for a 90 s video.")
@@ -122,12 +124,12 @@ def _run():
     claims = get_sample_claims(pack) if pack else claims_from_text(reference)
     if not claims:
         return None, "No usable sentence (8-24 words) was found in your text."
-    key = hashlib.sha1(f"{request_text}|{fmt_key}|{pack}|{reference}|{voice_id}|{speed}|{engine.name}|{burn}"
+    key = hashlib.sha1(f"{request_text}|{fmt_key}|{pack}|{reference}|{voice_id}|{speed}|{engine.name}|{burn}|{topic_engine}"
                        .encode()).hexdigest()[:10]
     out = OUTPUT_DIR / "videos" / f"web-{key}.mp4"
     bar = st.progress(0.0, text="Planning…")
     res = make_video(request_text, claims, out, engine=engine, voice=voice, speed=speed, reference_text=reference,
-                     output_format=format_from_choice(fmt_key), burn_subtitles=burn,
+                     output_format=format_from_choice(fmt_key), burn_subtitles=burn, visual_engine=topic_engine,
                      progress=lambda f, m: bar.progress(min(1.0, f), text=f"Rendering {m}"))
     bar.empty()
     return res, ""

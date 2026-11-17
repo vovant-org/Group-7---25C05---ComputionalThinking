@@ -37,8 +37,13 @@ def cue_texts(narration: str, max_words: int = MAX_CUE_WORDS) -> list[str]:
         if n <= max_words:
             out.append(sentence.strip())
         else:
-            parts = L.split_chunks(sentence, math.ceil(n / max_words), L.LOOP_CONN | L.COMPARE_CONN | L.STEP_CONN)
-            out.extend(p for p in parts if p)
+            k = math.ceil(n / max_words)
+            parts = [p for p in L.split_chunks(sentence, k, L.LOOP_CONN | L.COMPARE_CONN | L.STEP_CONN) if p]
+            if sum(len(p.split()) for p in parts) != n:       # the connector word ("so", "while") was dropped:
+                words = sentence.split()                      # subtitles must carry every spoken word, so cut by count
+                size = math.ceil(n / k)
+                parts = [" ".join(words[i:i + size]) for i in range(0, n, size)]
+            out.extend(parts)
     return out
 
 

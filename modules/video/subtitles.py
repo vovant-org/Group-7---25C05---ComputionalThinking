@@ -15,7 +15,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from modules.video import labels as L
-from modules.video.composer import Style, fit_text
+from modules.video.composer import Style, fit_text, wrap
 from modules.video.fonts import get_font
 from modules.voice_segmenter.segmenter import split_sentences
 
@@ -71,6 +71,25 @@ def to_srt(cues: Sequence[Cue]) -> str:
                    for i, c in enumerate(cues, 1))
 
 
+def balanced_lines(text: str, size: int, max_w: float) -> list[str]:
+    """Greedy wrapping fills the first line and can leave a single word on the last one ("... around /
+    you"). Keep the same number of lines but make them even: narrow the width as far as it goes without
+    needing one more line."""
+    font = get_font(size)
+    lines = wrap(text, font, max_w)
+    if len(lines) < 2:
+        return lines
+    lo, hi, best = max(font.getlength(w) for w in text.split()), max_w, lines
+    for _ in range(16):
+        mid = (lo + hi) / 2
+        cand = wrap(text, font, mid)
+        if len(cand) <= len(lines):
+            best, hi = cand, mid
+        else:
+            lo = mid
+    return best
+
+
 def cue_band(text: str, st: Style = Style()) -> tuple[np.ndarray, np.ndarray]:
     """Burned-in subtitle: (rgb float32, alpha float32) of the bottom band (sub_h x width)."""
     w, h = st.size[0], st.sub_h
@@ -78,6 +97,7 @@ def cue_band(text: str, st: Style = Style()) -> tuple[np.ndarray, np.ndarray]:
     d = ImageDraw.Draw(img)
     d.rectangle((0, 0, w, h), fill=(10, 14, 26, 170))
     lines, size, _ = fit_text(text, w - 140, h - 24, 34, st.min_font)
+    lines = balanced_lines(text, size, w - 140)                  # no one-word last line
     font = get_font(size)
     total = len(lines) * size * 1.25
     y = (h - total) / 2

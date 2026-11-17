@@ -1,6 +1,6 @@
 """Streamlit page: make an INFOGRAPHIC or ANIMATION video (MP4 with voice-over and subtitles).
 
-Open with `streamlit run app.py`, then choose "Make video" in the sidebar. All logic lives in
+Open with `streamlit run app.py`, then choose "Classic video maker" in the sidebar (the Studio is the main screen). All logic lives in
 `modules/video/` (tested without Streamlit); this page only collects the settings and shows the result.
 
 Layout: sidebar (1 request and format, 2 voice, 3 options) | headline numbers | tabs
@@ -22,9 +22,11 @@ from modules.providers import edge_tts_provider as tts_engine
 from modules.video.claims import claims_from_text
 from modules.video.make_video import make_video
 from modules.video.voice import FFmpegMissing, find_ffmpeg, make_engine
+from ui.theme import css
 from modules.voice_library.library import LANGUAGES, SPEED_MAX, SPEED_MIN, VoiceLibraryError, builtin_library, load_library
 
 st.set_page_config(page_title="StoryFrame Studio – make a video", page_icon="🎥", layout="wide")
+st.markdown(css(hide_nav=False), unsafe_allow_html=True)
 
 try:
     LIB = load_library()

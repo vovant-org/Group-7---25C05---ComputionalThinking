@@ -11,7 +11,8 @@
     python -m modules.pipeline.cli "Tạo video infographic 90 giây về giấc ngủ" --topic sleep_vi --voice vi-hoaimy
     python -m modules.voice_library.cli [--language vi] [--check]   # list voices / verify them on the TTS engine
     python -m evaluation.visual_engine_benchmark     # -> outputs/visual_engine_benchmark.csv (Topic-aware Visual Engine)
-    streamlit run app.py                        # Lab04 demo page (language + voice picker in the sidebar)
+    pip install -r requirements-video.txt       # Pillow, numpy, FFmpeg: needed to make the MP4
+    streamlit run app.py                        # StoryFrame Studio (see docs/studio-ui.md); tool pages in its sidebar
     python -m evaluation.measure_tts --make-manifest   # real TTS measurement workflow, see docs/team-brief-next-steps.md
 
 ## Status
@@ -24,7 +25,8 @@
 | modules/scene_segmenter | D1 greedy, D2 MMR, D2f MMR + facet, scenes/layouts (docs/iteration-log-scene.md) |
 | timeline_assembler | v0: S12/S13 checks (pure function) |
 | modules/voice_library + providers/edge_tts_provider | 8 EN/VI voices, speaking-speed choice, language check, optional preview (docs/voice-library.md); speaking rates still ASSUMED |
-| modules/pipeline + app.py | Lab04 feature: Router → Scene → Budget → Voice → Timeline, CLI + Streamlit (specs/001-pipeline-demo/) |
+| modules/pipeline | Lab04 feature: Router → Scene → Budget → Voice → Timeline, CLI (specs/001-pipeline-demo/); its dashboard is now `pages/2_Pipeline_lab.py` |
+| ui/ + app.py | Studio front end ("Dark Premium AI Studio"): prompt composer, format/voice/cost panel, generation steps, video studio (docs/studio-ui.md) |
 | modules/visual_engine | Topic-aware Visual Engine for ANIMATION: topic analysis, per-domain kits, content-aware motion, word-level sync, quality checks (docs/topic-aware-visual-engine.md) |
 | narration script generator, real providers, REASON step | TODO |
 

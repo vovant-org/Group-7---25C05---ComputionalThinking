@@ -11,3 +11,8 @@ Release/
 env/
 venv/
 outputs/voice_previews/
+
+outputs/videos/
+*_work/
+__pycache__/
+.pytest_cache/

@@ -12,7 +12,7 @@ from typing import Optional, Sequence
 import pandas as pd
 
 from core.config import PROFILES
-from core.models import TimelineEntry
+from core.models import OutputFormat, TimelineEntry
 from modules.pipeline.pipeline import PipelineResult
 from modules.voice_library.library import VoiceLibrary, VoiceProfile
 from modules.voice_segmenter.segmenter import VoiceParams, in_band
@@ -29,7 +29,14 @@ LAYOUT_LABELS = {"cause_chain": "🔗 cause chain", "compare_2col": "⚖️ two-
                  "big_number": "🔢 big number", "loop": "🔁 loop"}
 
 
+CUTOUT_LABELS = {"cause_effect": "cause → effect", "bars": "bars", "steps": "steps", "chart": "chart",
+                 "bulb": "idea", "bubble": "talking"}
+
+
 def layout_label(layout: Optional[str]) -> str:
+    if layout and layout.startswith("cutout:"):                 # ANIMATION scene: "cutout:<prop>"
+        prop = layout.split(":", 1)[1]
+        return f"🧍 cut-out · {CUTOUT_LABELS.get(prop, prop)}"
     return LAYOUT_LABELS.get(layout, "🎞️ character scene" if layout is None else layout)
 
 
@@ -262,3 +269,53 @@ def benchmark_summaries(out_dir: Path) -> dict[str, Optional[pd.DataFrame]]:
                                    f"facet coverage {_pct(m['facet_cov'])}"})
         out["scene"] = pd.DataFrame(rows)
     return out
+
+
+# ------------------------------------------------------------------ "Make video" page
+# key -> (label, one-line help, format handed to the Router; None = read it from the request text)
+VIDEO_FORMATS = {
+    "auto": ("Auto", "Use the format named in the request (infographic when none is named).", None),
+    "infographic": ("Infographic", "Cards, arrows and numbers drawn by code; the parts appear with the narration.",
+                    OutputFormat.INFOGRAPHIC),
+    "animation": ("Animation", "A cut-out stick figure acts out each scene with keyframe motion. "
+                  "AI clips (CLIP) are not available, so every scene is LAYERED.", OutputFormat.ANIMATION),
+}
+_CHECK_NAMES = {
+    "INFOGRAPHIC": {"S11": "no AI clips", "S12": "60–120 s", "S13": "≤ 5 % off target", "S15": "labels"},
+    "ANIMATION": {"S11": "every scene moves", "S12": "60–120 s", "S13": "≤ 5 % off target",
+                  "S15": "no text drawn (n/a)"},
+}
+
+
+def format_from_choice(key: str) -> Optional[OutputFormat]:
+    """The OutputFormat behind a radio choice; None for "auto". KeyError for an unknown key."""
+    return VIDEO_FORMATS[key][2]
+
+
+def video_check_names(fmt: str) -> dict:
+    """Short names of the criteria chips, which depend on the format of the finished video."""
+    return dict(_CHECK_NAMES.get(fmt, _CHECK_NAMES["INFOGRAPHIC"]))
+
+
+def video_scene_rows(report: dict) -> list[dict]:
+    """Table of the scenes of a finished video. Animation shows the motion plan, infographic the labels."""
+    animation = report.get("format") == "ANIMATION"
+    rows = []
+    for t in report.get("timeline", []):
+        row = {"scene": t["scene"], "start_s": t["start_s"], "length_s": t["duration_s"], "mode": t["mode"],
+               "layout": layout_label(t["layout"])}
+        if animation:
+            row.update({"pose": t.get("pose", ""), "prop": t.get("prop", ""), "energy": t.get("energy", "")})
+            row["narration"] = t["narration"]
+        else:
+            row["labels"] = " | ".join(t["labels"])
+        rows.append(row)
+    return rows
+
+
+def video_metrics(report: dict) -> list[tuple[str, str, str]]:
+    """Headline numbers of a finished video: (label, value, help)."""
+    return [("Format", str(report.get("format", "")).title(), "format that was built"),
+            ("Length", f"{report['total_s']:.1f} s", f"requested {report['t_target']:.0f} s"),
+            ("Scenes", str(report["scenes"]), "one per selected claim"),
+            ("Off target", f"{report['deviation']:.1%}", "S13: at most 5 %")]

@@ -11,12 +11,32 @@
     python -m modules.pipeline.cli "Tạo video infographic 90 giây về giấc ngủ" --topic sleep_vi --voice vi-hoaimy
     python -m modules.voice_library.cli [--language vi] [--check]   # list voices / verify them on the TTS engine
     python -m evaluation.visual_engine_benchmark     # -> outputs/visual_engine_benchmark.csv (Topic-aware Visual Engine)
-    streamlit run app.py                        # StoryFrame Studio workspace (new UI, see "The workspace" below)
+    python -m streamlit run app.py              # StoryFrame Studio workspace (new UI, see "The workspace" below)
     python -m evaluation.measure_tts --make-manifest   # real TTS measurement workflow, see docs/team-brief-next-steps.md
 
-## The workspace (`streamlit run app.py`)
-Python 3.10+ and `pip install -r requirements.txt -r requirements-video.txt` (the second file adds FFmpeg via imageio-ffmpeg and the
-video libraries). Then `streamlit run app.py`.
+## The workspace (`python -m streamlit run app.py`)
+Requires Python 3.10+. Run these from the project root folder (so `.streamlit/config.toml`, the dark theme, is picked up):
+
+    python -m venv .venv                                    # optional but recommended
+    .venv\Scripts\activate                                  # Windows PowerShell  (macOS/Linux: source .venv/bin/activate)
+    python -m pip install -r requirements.txt -r requirements-video.txt
+    python -m streamlit run app.py
+
+`requirements-video.txt` adds Pillow, numpy and `imageio-ffmpeg` (a bundled FFmpeg), which the video maker needs.
+Optional voices: `python -m pip install pyttsx3` (offline system voice) or `edge-tts` (online, sends the narration text to Microsoft).
+
+Always use the `python -m pip ...` / `python -m streamlit ...` form. With several Pythons installed (common on Windows),
+a bare `pip` or `streamlit` can belong to a different Python than `python`, and packages then look "missing".
+
+### Troubleshooting
+| Message in the app | Cause and fix |
+|---|---|
+| **FFmpeg was not found** | FFmpeg is neither on PATH nor installed through `imageio-ffmpeg` *for the Python that runs Streamlit*. Run `python -m pip install imageio-ffmpeg`, check with `python -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"`, then restart Streamlit (Ctrl+C, run again). Alternative: `winget install Gyan.FFmpeg`, then open a new terminal. |
+| `ModuleNotFoundError` for a package you just installed | `pip` and `python` point to different Pythons. Compare `python -c "import sys; print(sys.executable)"` with the path shown by `pip --version`; install with `python -m pip install ...`. |
+| Buttons or inputs look white / the theme is light | Streamlit was started outside the project folder, so `.streamlit/config.toml` was not read. `cd` into the project root and restart. |
+| **Create Video** is greyed out | Read the red/amber messages above the button; each one names what to fix (empty topic, missing reference text, voice language mismatch, budget too low, FFmpeg). |
+| Video has no sound | The *Silent* voice engine is selected (the default when `pyttsx3` is not installed). Install `pyttsx3` or choose the Edge voice in the Voice tab. |
+| A topic like "Explain AI" cannot be generated | The REASON step is not built: use a demo template, or paste / upload your own reference text (full sentences of 8-24 words). |
 
 Flow: **New Project → enter topic → configure video → see the cost estimate → Create Video → review the storyboard and timeline → download**.
 

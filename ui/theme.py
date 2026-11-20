@@ -12,7 +12,7 @@ TOKENS = {
     "accent": "#8B5CF6",      # primary accent
     "accent2": "#06B6D4",     # secondary accent
     "text": "#F8FAFC",        # main text
-    "muted": "#94A3B8",       # secondary text
+    "muted": "#000000",       # secondary text
     "border": "#293244",
     "success": "#22C55E",
     "warning": "#F59E0B",
@@ -226,6 +226,29 @@ div[data-testid="stVerticalBlockBorderWrapper"]{border-color:var(--sf-border)!im
 }
 @media (max-width:760px){
   .sf-tl-label{width:60px}.sf-axis{margin-left:calc(60px + .7rem)}
+}
+.stButton > button,
+[data-testid="stBaseButton-secondary"],
+[data-testid="stBaseButton-primary"] {
+    background-color: #1e2230 !important;
+    color: #f8fafc !important;
+    border: 1px solid #3b4254 !important;
+}
+.stButton > button *,
+[data-testid="stBaseButton-secondary"] *,
+[data-testid="stBaseButton-primary"] * {
+    color: #f8fafc !important;
+}
+.stButton > button:hover,
+[data-testid="stBaseButton-secondary"]:hover,
+[data-testid="stBaseButton-primary"]:hover {
+    background-color: #2b3144 !important;
+    border-color: #6366f1 !important;
+}
+[data-testid="stSidebar"] *,
+[data-testid="stRadio"] *,
+label, .stMarkdown p {
+    color: #f1f5f9 !important;
 }
 """
 

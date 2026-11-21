@@ -172,8 +172,7 @@ def _step_content(ctx: dict) -> None:
                      placeholder="Or paste the text here. Use full sentences of 8–24 words. The video is built only from this text; "
                                  "StoryFrame cannot research a topic by itself yet.")
         words = count_words(ss["topic"]) + count_words(ss["reference"])
-        st.markdown(f"<div style='text-align:right;font-size:.78rem;color:{'#F87171' if words > MAX_WORDS else '#94A3B8'}'>"
-                    f"{words:,} / {MAX_WORDS:,} words</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='sf-count{' over' if words > MAX_WORDS else ''}'>{words:,} / {MAX_WORDS:,} words</div>", unsafe_allow_html=True)
 
         html(C.section("No material yet? Try a ready-made example"))
         demos = runner.demo_templates()

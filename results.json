@@ -1,0 +1,146 @@
+[
+ {
+  "id": "INF-01",
+  "grp": "INFO",
+  "title": "Happy path, English, sleep, 90 s",
+  "request": "Make a 90-second infographic video about sleep",
+  "inputs": {
+   "pack": "sleep"
+  },
+  "expect": "Video planned; S11-S15 pass; 6-30 scenes",
+  "ok": true,
+  "error": "",
+  "status": "OK",
+  "stopped_at": null,
+  "stages": [
+   [
+    "router",
+    true,
+    "ACCEPT: INFOGRAPHIC, 90 s, 7 input words"
+   ],
+   [
+    "scene_segmenter",
+    true,
+    "12 scenes, 12/16 claims (D2f_mmr_facet), estimated 85.82 s"
+   ],
+   [
+    "budget_optimizer",
+    true,
+    "cost 36/36 (auto budget), motion 100% (v2_dp_motion_state)"
+   ],
+   [
+    "voice_segmenter",
+    true,
+    "7 voice units, 14% in 10-12 s band (estimated, F4_dp_share); voice Aria x1 at 165 wpm (assumed)"
+   ],
+   [
+    "timeline_assembler",
+    true,
+    "total 89.4 s vs target 90 s (deviation 0.6%); S12/S13 hold"
+   ]
+  ],
+  "messages": [],
+  "log": [],
+  "secs": 0.3,
+  "format": "INFOGRAPHIC",
+  "scenes": 12,
+  "total_s": 89.418,
+  "deviation": 0.0065,
+  "criteria": {
+   "S11": [
+    true,
+    "no AI clips; modes REVEAL"
+   ],
+   "S12": [
+    true,
+    "89.42 s (from the timeline)"
+   ],
+   "S13": [
+    true,
+    "0.6% off the 90 s target"
+   ],
+   "S15": [
+    true,
+    "every label comes from its claim; smallest font 34px (limit 26px, assumed)"
+   ]
+  },
+  "notes": [
+   "The audio track is SILENT (SilentEngine): durations follow a words-per-minute rule.",
+   "loop needs three natural parts in the claim; drew cause_chain"
+  ]
+ },
+ {
+  "id": "INF-02",
+  "grp": "INFO",
+  "title": "Happy path, English, inflation, 90 s",
+  "request": "Make a 90-second infographic video about inflation",
+  "inputs": {
+   "pack": "inflation"
+  },
+  "expect": "Video planned; S11-S15 pass",
+  "ok": true,
+  "error": "",
+  "status": "OK",
+  "stopped_at": null,
+  "stages": [
+   [
+    "router",
+    true,
+    "ACCEPT: INFOGRAPHIC, 90 s, 7 input words"
+   ],
+   [
+    "scene_segmenter",
+    true,
+    "12 scenes, 12/16 claims (D2f_mmr_facet), estimated 84.36 s"
+   ],
+   [
+    "budget_optimizer",
+    true,
+    "cost 36/36 (auto budget), motion 100% (v2_dp_motion_state)"
+   ],
+   [
+    "voice_segmenter",
+    true,
+    "7 voice units, 14% in 10-12 s band (estimated, F4_dp_share); voice Aria x1 at 165 wpm (assumed)"
+   ],
+   [
+    "timeline_assembler",
+    true,
+    "total 88.0 s vs target 90 s (deviation 2.3%); S12/S13 hold"
+   ]
+  ],
+  "messages": [],
+  "log": [],
+  "secs": 0.3,
+  "format": "INFOGRAPHIC",
+  "scenes": 12,
+  "total_s": 87.964,
+  "deviation": 0.0226,
+  "criteria": {
+   "S11": [
+    true,
+    "no AI clips; modes REVEAL"
+   ],
+   "S12": [
+    true,
+    "87.96 s (from the timeline)"
+   ],
+   "S13": [
+    true,
+    "2.3% off the 90 s target"
+   ],
+   "S15": [
+    true,
+    "every label comes from its claim; smallest font 28px (limit 26px, assumed)"
+   ]
+  },
+  "notes": [
+   "The audio track is SILENT (SilentEngine): durations follow a words-per-minute rule.",
+   "trend_chart needs two figures with a unit in the claim; drew cause_chain"
+  ]
+ },
+ {
+  "id": "INF-03",
+  "grp": "INFO",
+  "title": "Vietnamese request + Vietnamese voice",
+  "request": 

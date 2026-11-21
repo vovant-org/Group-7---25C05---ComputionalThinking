@@ -12,7 +12,7 @@ TOKENS = {
     "accent": "#8B5CF6",      # primary accent
     "accent2": "#06B6D4",     # secondary accent
     "text": "#F8FAFC",        # main text
-    "muted": "#000000",       # secondary text
+    "muted": "#94A3B8",       # secondary text
     "border": "#293244",
     "success": "#22C55E",
     "warning": "#F59E0B",

@@ -37,7 +37,7 @@ from modules.pipeline.pipeline import PipelineResult, PipelineStatus, run_pipeli
 from modules.router.router import Request
 from modules.video.animation import AnimatedScene, check_animation, compose_animation_scene
 from modules.video.composer import ComposedScene, Style, check_labels, compose_scene
-from modules.video.render import RenderError, probe_duration, render_video
+from modules.video.render import DEFAULT_QUALITY, QUALITY_PROFILES, RenderError, probe_duration, render_video
 from modules.video.voice import (SilentEngine, SpeechEngine, VoiceError, VoiceRecorder, make_engine)
 from modules.voice_library.library import VoiceProfile
 
@@ -158,7 +158,8 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
                output_format: Optional[OutputFormat] = None, fps: int = 24, burn_subtitles: bool = True,
                soft_subtitles: bool = True, render: bool = True, work_dir: Optional[Path] = None,
                style: Style = Style(), progress: Optional[Callable[[float, str], None]] = None,
-               max_adjustments: int = MAX_ADJUSTMENTS, visual_engine: bool = True) -> VideoResult:
+               max_adjustments: int = MAX_ADJUSTMENTS, visual_engine: bool = True,
+               quality: str = DEFAULT_QUALITY) -> VideoResult:
     out_path = Path(out_path)
     if work_dir is None:                                  # dry run: scratch space only, nothing left behind
         work_dir = out_path.parent / (out_path.stem + "_work") if render else Path(tempfile.mkdtemp(prefix="sfs_"))
@@ -224,7 +225,7 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
     if render:
         try:
             render_info = render_video(res.timeline, composed, recorder, out_path, style, fps, burn_subtitles,
-                                       soft_subtitles, progress)
+                                       soft_subtitles, progress, quality)
             measured_s = probe_duration(out_path)
         except (RenderError, VoiceError, RuntimeError) as exc:
             return _fail(res, log, f"render failed: {exc}")
@@ -244,6 +245,8 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
         if not q.ok:
             report["notes"] = report.get("notes", []) + ["Visual quality: " + "; ".join(q.problems[:4])]
     if render:
+        report["quality"] = render_info.get("quality", quality)
+        report["resolution"] = render_info.get("size", report["resolution"])    # the size of the file, not of the drawing
         out_path.with_suffix(".report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2),
                                                         encoding="utf-8")
     return VideoResult(True, out_path if render else None, res, report, log)
@@ -323,6 +326,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--no-burn", action="store_true", help="do not burn subtitles into the picture")
     ap.add_argument("--no-soft-subs", action="store_true", help="do not add the soft subtitle track")
     ap.add_argument("--fps", type=int, default=24)
+    ap.add_argument("--quality", choices=list(QUALITY_PROFILES), default=DEFAULT_QUALITY,
+                    help="output quality: draft 480p / standard 720p (default) / high 1080p")
     ap.add_argument("--dry-run", action="store_true", help="plan, compose and check everything but write no video")
     ap.add_argument("--no-visual-engine", action="store_true", help="ANIMATION: use the generic stick-figure animation")
     a = ap.parse_args(argv)
@@ -360,7 +365,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     r = make_video(a.request, claims, out, engine=engine, voice=voice, speed=a.speed, reference_text=reference,
                    fps=a.fps, burn_subtitles=not a.no_burn, soft_subtitles=not a.no_soft_subs,
-                   render=not a.dry_run, progress=show, visual_engine=not a.no_visual_engine)
+                   render=not a.dry_run, progress=show, visual_engine=not a.no_visual_engine, quality=a.quality)
     print()
     for line in r.log:
         print("  adjust:", line)

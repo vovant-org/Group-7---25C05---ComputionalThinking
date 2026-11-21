@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping, Optional
 
@@ -34,6 +35,41 @@ ZOOM_END = 1.07           # PAN: zoom goes from 1.0 to this
 
 class RenderError(RuntimeError):
     pass
+
+
+# ------------------------------------------------------------------------------------------ output quality
+@dataclass(frozen=True)
+class Quality:
+    """How the finished file is encoded. Scenes are always DRAWN at the Style size (1280x720: every layout, font
+    size and the S15 label checks are defined in those pixels); a different `size` only rescales at encode time."""
+    key: str
+    label: str
+    size: tuple[int, int]
+    crf: int                   # x264 constant rate factor: lower = better picture, bigger file
+    preset: str                # x264 speed preset: slower = smaller file for the same picture
+    note: str
+
+
+QUALITY_PROFILES: dict[str, Quality] = {q.key: q for q in (
+    Quality("draft", "Draft", (854, 480), 28, "veryfast", "480p: smallest file, quickest to make. Good for checking the script and timing."),
+    Quality("standard", "Standard", (1280, 720), 20, "veryfast", "720p: the project default (the same settings the videos had before this option existed)."),
+    Quality("high", "High", (1920, 1080), 16, "medium", "1080p, higher bitrate: the best picture and the slowest render. Scenes are drawn at 720p "
+                                                       "and scaled up, so it looks smoother but shows no extra detail."),
+)}
+DEFAULT_QUALITY = "standard"
+
+
+def quality_profile(key: str) -> Quality:
+    try:
+        return QUALITY_PROFILES[key]
+    except KeyError:
+        raise RenderError(f"unknown video quality {key!r}; choose one of {', '.join(QUALITY_PROFILES)}") from None
+
+
+def video_args(q: Quality, source_size: tuple[int, int]) -> list[str]:
+    """FFmpeg arguments for the video stream: a rescale when the output size differs from the drawn size, then x264."""
+    scale = [] if tuple(q.size) == tuple(source_size) else ["-vf", f"scale={q.size[0]}:{q.size[1]}:flags=lanczos"]
+    return scale + ["-c:v", "libx264", "-preset", q.preset, "-crf", str(q.crf), "-pix_fmt", "yuv420p"]
 
 
 class SceneRenderer:
@@ -103,14 +139,15 @@ def probe_duration(path: Path, ffmpeg: Optional[str] = None) -> float:
 
 def render_video(timeline, composed: Mapping[int, ComposedScene], recorder: VoiceRecorder, out_path: Path,
                  st: Style = Style(), fps: int = 24, burn_subtitles: bool = True, soft_subtitles: bool = True,
-                 progress: Optional[Callable[[float, str], None]] = None) -> dict:
-    """Write the MP4. Returns {"frames", "cues", "srt"}. Raises RenderError with FFmpeg's message."""
+                 progress: Optional[Callable[[float, str], None]] = None, quality: str = DEFAULT_QUALITY) -> dict:
+    """Write the MP4. Returns {"frames", "cues", "srt", "quality", "size"}. Raises RenderError with FFmpeg's message."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     ffmpeg = find_ffmpeg()
     entries = timeline.entries
     if not entries:
         raise RenderError("empty timeline")
+    q = quality_profile(quality)
     W, H = st.size
     n_total = int(round(timeline.total_s * fps))
     cues: list[Cue] = make_cues(entries)
@@ -134,8 +171,7 @@ def render_video(timeline, composed: Mapping[int, ComposedScene], recorder: Voic
         if soft_subtitles:
             cmd += ["-i", str(srt_path)]
         cmd += ["-map", "0:v", "-map", "1:a"] + (["-map", "2:s"] if soft_subtitles else [])
-        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
-                "-c:a", "aac", "-b:a", "128k"]
+        cmd += video_args(q, (W, H)) + ["-c:a", "aac", "-b:a", "128k"]
         if soft_subtitles:
             cmd += ["-c:s", "mov_text"]
         cmd += ["-movflags", "+faststart", "-t", f"{timeline.total_s:.3f}", str(out_path)]
@@ -179,4 +215,4 @@ def render_video(timeline, composed: Mapping[int, ComposedScene], recorder: Voic
             raise RenderError("ffmpeg failed: " + err_file.read_text(errors="replace").strip()[-600:])
     if progress:
         progress(1.0, "done")
-    return {"frames": n_total, "cues": len(cues), "srt": str(srt_path)}
+    return {"frames": n_total, "cues": len(cues), "srt": str(srt_path), "quality": q.key, "size": list(q.size)}

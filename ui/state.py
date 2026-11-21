@@ -13,8 +13,8 @@ import streamlit as st
 VIEWS = ("create", "generate", "studio", "projects", "templates", "voices", "settings")
 
 DEFAULTS: dict[str, Any] = {
-    "view": "create", "topic": "", "instructions": "", "reference": "", "upload_name": "", "upload_error": "", "upload_n": 0,
-    "source": "demo", "pack": "sleep", "language": "en", "fmt": "INFOGRAPHIC", "duration": 90, "auto_budget": True, "budget": 100,
+    "view": "create", "step": 1, "topic": "", "instructions": "", "reference": "", "upload_name": "", "upload_error": "", "upload_n": 0,
+    "source": "text", "pack": "sleep", "language": "en", "fmt": "INFOGRAPHIC", "duration": 90, "auto_budget": True, "budget": 100,
     "speed": 1.0, "engine": None, "allow_online": False, "subtitles": "burn", "topic_aware": True,
     "voice_en": None, "voice_vi": None, "project": None, "sel_scene": None, "board_view": "Cards",
     "job": None, "gen_state": "idle", "last_outcome": None, "project_filter": "All formats", "preview": None,
@@ -54,7 +54,9 @@ def sync(key: str) -> None:
 def goto(view: str, **values: Any) -> None:
     """Callback: switch screen (and optionally set settings first)."""
     for k, v in values.items():
-        put(k, v) if k in DEFAULTS and k not in ("project", "sel_scene") else st.session_state.__setitem__(k, v)
+        put(k, v) if k in DEFAULTS and k not in ("project", "sel_scene", "step") else st.session_state.__setitem__(k, v)
+    if view == "create" and "step" not in values:        # a new project always starts at the first step
+        st.session_state["step"] = 1
     st.session_state["view"] = view
 
 

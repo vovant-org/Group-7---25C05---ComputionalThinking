@@ -256,3 +256,14 @@ def test_theme_uses_the_palette_of_the_brief():
         assert value.lower() in CSS.lower() or value.upper() in CSS
     cfg = (PROJECT_ROOT / ".streamlit" / "config.toml").read_text(encoding="utf-8")
     assert '"#8B5CF6"' in cfg and '"#0B0D12"' in cfg
+
+
+def test_stepper_marks_done_current_and_pending_steps():
+    html = C.stepper(["Question", "Format", "Voice", "Budget"], 3)
+    assert html.count("sf-step done") == 2 and html.count("sf-step on") == 1
+    assert html.count('class="sf-step ') == 4 and html.count("sf-step-line") == 3
+    assert "<br" not in html and "\n" not in html
+
+
+def test_stepper_escapes_labels():
+    assert "<script>" not in C.stepper(["<script>alert(1)</script>"], 1)

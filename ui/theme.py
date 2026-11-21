@@ -227,6 +227,19 @@ div[data-testid="stVerticalBlockBorderWrapper"]{border-color:var(--sf-border)!im
 @media (max-width:760px){
   .sf-tl-label{width:60px}.sf-axis{margin-left:calc(60px + .7rem)}
 }
+
+/* ---------- step-by-step flow ---------- */
+.sf-steps{display:flex;align-items:center;justify-content:center;gap:.4rem;margin:.2rem 0 1.5rem 0;flex-wrap:wrap}
+.sf-step{display:flex;align-items:center;gap:.55rem;padding:.4rem .9rem .4rem .45rem;border:1px solid var(--sf-border);border-radius:999px;
+  background:var(--sf-card);color:var(--sf-muted);font-size:.85rem;font-weight:550}
+.sf-step .n{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--sf-bg2);
+  border:1px solid var(--sf-border);font-size:.76rem;font-weight:700}
+.sf-step.on{border-color:rgba(139,92,246,.6);background:rgba(139,92,246,.14);color:var(--sf-text)}
+.sf-step.on .n{background:var(--sf-accent);border-color:transparent;color:#fff}
+.sf-step.done{color:var(--sf-text)}
+.sf-step.done .n{background:var(--sf-ok);border-color:transparent;color:#fff}
+.sf-step-line{width:22px;height:2px;background:var(--sf-border);border-radius:2px}
+@media (max-width:760px){.sf-step:not(.on) .l{display:none}.sf-step-line{width:12px}}
 .stButton > button,
 [data-testid="stBaseButton-secondary"],
 [data-testid="stBaseButton-primary"] {

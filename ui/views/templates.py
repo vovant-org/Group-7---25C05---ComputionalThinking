@@ -15,6 +15,8 @@ def _use(pack: str, label: str, language: str, fmt: str) -> None:
     S.put("pack", pack)
     S.put("language", language)
     S.put("fmt", fmt)
+    S.put("reference", "")
+    st.session_state["step"] = 3            # content and format are already chosen: continue at the voice step
     st.session_state["view"] = "create"
 
 

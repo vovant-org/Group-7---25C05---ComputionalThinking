@@ -328,3 +328,16 @@ def storyboard_preview(title: str, text: str) -> str:
 def badges(items: Iterable[tuple[str, str]]) -> str:
     """Row of badges: [(text, kind), ...]."""
     return f'<div class="sf-preview-bar">{"".join(badge(t, k) for t, k in items)}</div>'
+
+
+# --------------------------------------------------------------------------------------------- wizard
+def stepper(labels: Sequence[str], current: int) -> str:
+    """Progress header of the step-by-step flow. `current` is 1-based; earlier steps show a check mark."""
+    parts = []
+    for i, label in enumerate(labels, start=1):
+        state = "done" if i < current else ("on" if i == current else "")
+        mark = icon("check", 13, 2.8) if i < current else str(i)
+        parts.append(f'<div class="sf-step {state}"><span class="n">{mark}</span><span class="l">{esc(label)}</span></div>')
+        if i < len(labels):
+            parts.append('<div class="sf-step-line"></div>')
+    return f'<div class="sf-steps">{"".join(parts)}</div>'

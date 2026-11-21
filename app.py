@@ -19,7 +19,7 @@ from ui.views import create, generate, projects, settings, studio, templates, vo
 VIEWS = {"create": create, "generate": generate, "studio": studio, "projects": projects,
          "templates": templates, "voices": voices, "settings": settings}
 
-inject_theme()
 S.init(runner.default_engine())
+inject_theme()          # after S.init: it reads the light/dark choice from the session
 widgets.sidebar()
 VIEWS.get(st.session_state["view"], create).render()

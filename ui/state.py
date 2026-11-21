@@ -13,7 +13,7 @@ import streamlit as st
 VIEWS = ("create", "generate", "studio", "projects", "templates", "voices", "settings")
 
 DEFAULTS: dict[str, Any] = {
-    "view": "create", "step": 1, "topic": "", "instructions": "", "reference": "", "upload_name": "", "upload_error": "", "upload_n": 0,
+    "view": "create", "theme": "dark", "step": 1, "quality": "standard", "topic": "", "instructions": "", "reference": "", "upload_name": "", "upload_error": "", "upload_n": 0,
     "source": "text", "pack": "sleep", "language": "en", "fmt": "INFOGRAPHIC", "duration": 90, "auto_budget": True, "budget": 100,
     "speed": 1.0, "engine": None, "allow_online": False, "subtitles": "burn", "topic_aware": True,
     "voice_en": None, "voice_vi": None, "project": None, "sel_scene": None, "board_view": "Cards",

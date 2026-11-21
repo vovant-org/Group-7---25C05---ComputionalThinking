@@ -80,4 +80,7 @@ def sidebar() -> None:
             current = view == "studio" and st.session_state.get("project") == p["id"]
             btn(short_title(p["title"], 30), icon="movie", key=f"recent_{p['id']}", on_click=S.open_project, args=(p["id"],),
                 type="primary" if current else "secondary", help=p["title"])
+        html(C.side_label("Appearance"))
+        st.radio("Theme", ["dark", "light"], key=S.seed("theme"), on_change=S.sync, args=("theme",), horizontal=True,
+                 label_visibility="collapsed", format_func=lambda m: {"dark": "🌙 Dark", "light": "☀️ Light"}[m])
         html(C.profile("Group 7", "Local workspace · CSC10014"))

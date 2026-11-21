@@ -28,6 +28,8 @@ CSS = """
   --sf-bg:#0B0D12;--sf-bg2:#121620;--sf-card:#181E2A;--sf-accent:#8B5CF6;--sf-accent2:#06B6D4;
   --sf-text:#F8FAFC;--sf-muted:#94A3B8;--sf-border:#293244;--sf-ok:#22C55E;--sf-warn:#F59E0B;--sf-err:#EF4444;
   --sf-radius:16px;--sf-radius-sm:12px;
+  --sf-btn-bg:#1e2230;--sf-btn-bg-hover:#2b3144;--sf-btn-border:#3b4254;--sf-btn-text:#f8fafc;--sf-label:#f1f5f9;
+  --sf-soft:#CBD5E1;--sf-shadow:rgba(0,0,0,.22);--sf-expander:rgba(24,30,42,.55);--sf-hero-end:#B9A5FB;
 }
 html,body,[data-testid="stAppViewContainer"],.stApp{background:var(--sf-bg)!important;color:var(--sf-text);
   font-family:Inter,"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif}
@@ -63,7 +65,7 @@ section[data-testid="stSidebar"] .stButton>button[data-testid="stBaseButton-prim
 
 /* ---------- typography helpers ---------- */
 .sf-hero{text-align:center;padding:1.2rem 0 1.1rem 0}
-.sf-hero h1{font-size:2.15rem;margin:0 0 .35rem 0;font-weight:700;background:linear-gradient(90deg,#F8FAFC 30%,#B9A5FB 100%);
+.sf-hero h1{font-size:2.15rem;margin:0 0 .35rem 0;font-weight:700;background:linear-gradient(90deg,var(--sf-text) 30%,var(--sf-hero-end) 100%);
   -webkit-background-clip:text;background-clip:text;color:transparent}
 .sf-hero p{color:var(--sf-muted);font-size:1.02rem;margin:0}
 .sf-h2{font-size:1.15rem;font-weight:650;margin:0 0 .15rem 0}
@@ -74,7 +76,7 @@ section[data-testid="stSidebar"] .stButton>button[data-testid="stBaseButton-prim
 
 /* ---------- cards ---------- */
 .sf-card{background:var(--sf-card);border:1px solid var(--sf-border);border-radius:var(--sf-radius);padding:16px 18px;
-  box-shadow:0 8px 24px rgba(0,0,0,.22);transition:border-color .15s ease,transform .15s ease,box-shadow .15s ease}
+  box-shadow:0 8px 24px var(--sf-shadow);transition:border-color .15s ease,transform .15s ease,box-shadow .15s ease}
 .sf-card.hover:hover{border-color:rgba(139,92,246,.6);transform:translateY(-1px)}
 .sf-card.selected{border-color:var(--sf-accent);background:linear-gradient(180deg,rgba(139,92,246,.12),var(--sf-card) 70%);
   box-shadow:0 0 0 1px var(--sf-accent),0 12px 30px rgba(139,92,246,.18)}
@@ -111,7 +113,7 @@ section[data-testid="stSidebar"] .stButton>button[data-testid="stBaseButton-prim
 .sf-bar{height:8px;border-radius:99px;background:rgba(148,163,184,.16);overflow:hidden;margin:.55rem 0 .35rem 0}
 .sf-bar>span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#8B5CF6,#06B6D4)}
 .sf-bar.warn>span{background:var(--sf-warn)}.sf-bar.err>span{background:var(--sf-err)}.sf-bar.ok>span{background:linear-gradient(90deg,#22C55E,#06B6D4)}
-.sf-kv{display:flex;justify-content:space-between;gap:1rem;font-size:.84rem;padding:.22rem 0;border-bottom:1px dashed rgba(41,50,68,.8)}
+.sf-kv{display:flex;justify-content:space-between;gap:1rem;font-size:.84rem;padding:.22rem 0;border-bottom:1px dashed var(--sf-border)}
 .sf-kv:last-child{border-bottom:none}.sf-kv span:first-child{color:var(--sf-muted)}
 
 /* ---------- progress tracker ---------- */
@@ -129,7 +131,7 @@ section[data-testid="stSidebar"] .stButton>button[data-testid="stBaseButton-prim
 .sf-step-title{font-weight:600;font-size:.92rem;line-height:1.2}
 .sf-step.pending .sf-step-title{color:var(--sf-muted)}
 .sf-step-desc{font-size:.8rem;color:var(--sf-muted);margin-top:.12rem;line-height:1.4}
-.sf-step-detail{font-size:.78rem;color:#CBD5E1;margin-top:.2rem}
+.sf-step-detail{font-size:.78rem;color:var(--sf-soft);margin-top:.2rem}
 .sf-spin{width:14px;height:14px;border-radius:50%;border:2px solid rgba(196,181,253,.3);border-top-color:#C4B5FD;animation:sfspin .9s linear infinite}
 @keyframes sfspin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.sf-spin{animation:none}.sf-card,.sf-card.hover:hover{transition:none;transform:none}}
@@ -146,7 +148,7 @@ section[data-testid="stSidebar"] .stButton>button[data-testid="stBaseButton-prim
 .sf-scene-time{margin-left:auto;font-size:.74rem;color:var(--sf-muted);white-space:nowrap}
 .sf-scene-narr{font-size:.86rem;line-height:1.5;margin:.15rem 0 .55rem 0}
 .sf-scene-label{font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;color:var(--sf-muted);margin-top:.5rem;font-weight:600}
-.sf-scene-text{font-size:.8rem;color:#CBD5E1;line-height:1.45}
+.sf-scene-text{font-size:.8rem;color:var(--sf-soft);line-height:1.45}
 .sf-chips{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.45rem}
 
 /* ---------- timeline ---------- */
@@ -159,14 +161,14 @@ section[data-testid="stSidebar"] .stButton>button[data-testid="stBaseButton-prim
 .sf-clip.audio{background:linear-gradient(180deg,#22D3EE,#0891B2);color:#04202A}
 .sf-clip.sub{background:linear-gradient(180deg,#A78BFA,#7C3AED);color:#fff;font-weight:600}
 .sf-clip.sel{outline:2px solid #fff;outline-offset:-2px}
-.sf-clip.silent{background:repeating-linear-gradient(135deg,rgba(148,163,184,.25) 0 6px,rgba(148,163,184,.1) 6px 12px);color:#CBD5E1}
+.sf-clip.silent{background:repeating-linear-gradient(135deg,rgba(148,163,184,.25) 0 6px,rgba(148,163,184,.1) 6px 12px);color:var(--sf-soft)}
 .sf-axis{position:relative;height:18px;margin-left:calc(92px + .7rem)}
 .sf-axis span{position:absolute;transform:translateX(-50%);font-size:.68rem;color:var(--sf-muted)}
 .sf-legend{display:flex;flex-wrap:wrap;gap:.9rem;margin-top:.7rem;font-size:.76rem;color:var(--sf-muted)}
 .sf-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:.35rem;vertical-align:-1px}
 
 /* ---------- properties ---------- */
-.sf-prop{padding:.55rem 0;border-bottom:1px solid rgba(41,50,68,.7)}
+.sf-prop{padding:.55rem 0;border-bottom:1px solid var(--sf-border)}
 .sf-prop:last-child{border-bottom:none}
 .sf-prop-k{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--sf-muted);font-weight:600;margin-bottom:.15rem}
 .sf-prop-v{font-size:.88rem;line-height:1.45}
@@ -208,7 +210,7 @@ section[data-testid="stSidebar"] .stButton>button[data-testid="stBaseButton-prim
 .stButton>button:disabled{opacity:.45}
 button[data-baseweb="tab"]{font-weight:600}
 [data-baseweb="tab-highlight"]{background:var(--sf-accent)!important}
-[data-testid="stExpander"]{border:1px solid var(--sf-border)!important;border-radius:14px!important;background:rgba(24,30,42,.55)}
+[data-testid="stExpander"]{border:1px solid var(--sf-border)!important;border-radius:14px!important;background:var(--sf-expander)}
 [data-testid="stFileUploader"] section{background:var(--sf-bg2);border:1px dashed var(--sf-border);border-radius:14px}
 [data-testid="stProgress"]>div>div>div{background:linear-gradient(90deg,#8B5CF6,#06B6D4)!important}
 [data-testid="stDataFrame"]{border:1px solid var(--sf-border);border-radius:12px;overflow:hidden}
@@ -238,38 +240,89 @@ div[data-testid="stVerticalBlockBorderWrapper"]{border-color:var(--sf-border)!im
 .sf-step.on .n{background:var(--sf-accent);border-color:transparent;color:#fff}
 .sf-step.done{color:var(--sf-text)}
 .sf-step.done .n{background:var(--sf-ok);border-color:transparent;color:#fff}
+.sf-count{text-align:right;font-size:.78rem;color:var(--sf-muted)}.sf-count.over{color:var(--sf-err)}
 .sf-step-line{width:22px;height:2px;background:var(--sf-border);border-radius:2px}
 @media (max-width:760px){.sf-step:not(.on) .l{display:none}.sf-step-line{width:12px}}
 .stButton > button,
 [data-testid="stBaseButton-secondary"],
 [data-testid="stBaseButton-primary"] {
-    background-color: #1e2230 !important;
-    color: #f8fafc !important;
-    border: 1px solid #3b4254 !important;
+    background-color: var(--sf-btn-bg) !important;
+    color: var(--sf-btn-text) !important;
+    border: 1px solid var(--sf-btn-border) !important;
 }
 .stButton > button *,
 [data-testid="stBaseButton-secondary"] *,
 [data-testid="stBaseButton-primary"] * {
-    color: #f8fafc !important;
+    color: var(--sf-btn-text) !important;
 }
 .stButton > button:hover,
 [data-testid="stBaseButton-secondary"]:hover,
 [data-testid="stBaseButton-primary"]:hover {
-    background-color: #2b3144 !important;
+    background-color: var(--sf-btn-bg-hover) !important;
     border-color: #6366f1 !important;
 }
+.stButton > button[kind="primary"],.stButton > button[kind="primary"] *,
+[data-testid="stBaseButton-primary"],[data-testid="stBaseButton-primary"] *{color:#fff !important}
 [data-testid="stSidebar"] *,
 [data-testid="stRadio"] *,
 label, .stMarkdown p {
-    color: #f1f5f9 !important;
+    color: var(--sf-label) !important;
 }
 """
 
 
-def inject_theme() -> None:
-    """Add the stylesheet to the current page (call once, first thing, on every page)."""
+LIGHT_TOKENS = {"bg": "#F4F6FB", "bg2": "#FFFFFF", "card": "#FFFFFF", "accent": "#7C3AED", "accent2": "#0891B2", "text": "#0F172A",
+                "muted": "#475569", "border": "#D3DAE6", "success": "#16A34A", "warning": "#D97706", "error": "#DC2626"}
+
+MODES = ("dark", "light")
+
+# Appended after CSS in light mode. It redefines the variables and fixes what cannot follow them: tinted text that was
+# pale for a dark page, and Streamlit's own widgets (inputs, expander, tabs...) whose colours come from the dark theme.
+LIGHT_CSS = """
+/* ---------- light mode ---------- */
+:root{
+  --sf-bg:#F4F6FB;--sf-bg2:#FFFFFF;--sf-card:#FFFFFF;--sf-accent:#7C3AED;--sf-accent2:#0891B2;
+  --sf-text:#0F172A;--sf-muted:#475569;--sf-border:#D3DAE6;--sf-ok:#16A34A;--sf-warn:#D97706;--sf-err:#DC2626;
+  --sf-btn-bg:#FFFFFF;--sf-btn-bg-hover:#EEF1F8;--sf-btn-border:#C5CDDB;--sf-btn-text:#0F172A;--sf-label:#1E293B;
+  --sf-soft:#334155;--sf-shadow:rgba(15,23,42,.08);--sf-expander:rgba(255,255,255,.75);--sf-hero-end:#7C3AED;
+}
+html,.stApp{color-scheme:light}
+.stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"]{background:var(--sf-bg)!important;color:var(--sf-text)}
+section[data-testid="stSidebar"]{background:var(--sf-bg2)!important}
+.stApp [data-testid="stMarkdownContainer"] p,.stApp [data-testid="stMarkdownContainer"] li,.stApp h2,.stApp h3,.stApp h4{color:var(--sf-text)!important}
+.stApp .sf-hero p,.stApp .sf-empty p,[data-testid="stCaptionContainer"],[data-testid="stCaptionContainer"] *{color:var(--sf-muted)!important}
+[data-testid="stTextArea"] textarea,[data-testid="stTextInput"] input,[data-testid="stNumberInput"] input{
+  color:var(--sf-text)!important;-webkit-text-fill-color:var(--sf-text)!important;caret-color:var(--sf-text)}
+textarea::placeholder,input::placeholder{color:var(--sf-muted)!important;-webkit-text-fill-color:var(--sf-muted)!important;opacity:1}
+[data-baseweb="select"] *{color:var(--sf-text)!important}
+[data-testid="stNumberInput"] button{background:var(--sf-bg2)!important;color:var(--sf-text)!important}
+[data-testid="stExpander"] summary,[data-testid="stExpander"] summary *{color:var(--sf-text)!important}
+[data-testid="stFileUploader"] *{color:var(--sf-text)!important}
+[data-testid="stFileUploader"] small,[data-testid="stFileUploader"] span{color:var(--sf-muted)!important}
+button[data-baseweb="tab"]{color:var(--sf-muted)!important}
+button[data-baseweb="tab"][aria-selected="true"]{color:var(--sf-text)!important}
+[data-testid="stSlider"] label *,[data-testid="stTickBarMin"],[data-testid="stTickBarMax"]{color:var(--sf-text)!important}
+[data-testid="stToolbar"] *{color:var(--sf-text)!important}
+.sf-ico{color:#6D28D9}.sf-ico.cyan{color:#0E7490}
+.sf-badge.ok{color:#15803D}.sf-badge.warn{color:#B45309}.sf-badge.err{color:#B91C1C}.sf-badge.accent{color:#6D28D9}.sf-badge.info{color:#0E7490}
+.sf-alert.err{color:#B91C1C}.sf-alert.warn{color:#92400E}.sf-alert.info{color:#0E7490}.sf-alert.ok{color:#166534}
+.sf-scene-num{color:#6D28D9}.sf-claim b{color:#0E7490}
+.sf-clip.sel{outline-color:#0F172A}
+.sf-spin{border-color:rgba(109,40,217,.25);border-top-color:#6D28D9}
+"""
+
+
+def css_for(mode: str = "dark") -> str:
+    """The stylesheet for `mode` ("dark" is the default and the fallback for anything unknown)."""
+    return CSS + (LIGHT_CSS if mode == "light" else "")
+
+
+def inject_theme(mode: str | None = None) -> None:
+    """Add the stylesheet to the current page (call once, first thing, on every page).
+
+    `mode` is "dark" or "light"; by default the user's choice is read from the session (the sidebar switch)."""
     import streamlit as st
-    st.markdown(f"<style>{CSS}</style>", unsafe_allow_html=True)
+    st.markdown(f"<style>{css_for(mode or st.session_state.get('theme', 'dark'))}</style>", unsafe_allow_html=True)
 
 
 def legacy_page_header() -> None:

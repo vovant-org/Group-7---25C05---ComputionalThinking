@@ -10,7 +10,7 @@ from pathlib import Path
 from ui import adapters as A
 from ui import components as C
 from ui import runner, storage
-from ui.theme import CSS, TOKENS
+from ui.theme import CSS, LIGHT_CSS, LIGHT_TOKENS, TOKENS, css_for
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -267,3 +267,16 @@ def test_stepper_marks_done_current_and_pending_steps():
 
 def test_stepper_escapes_labels():
     assert "<script>" not in C.stepper(["<script>alert(1)</script>"], 1)
+
+
+def test_dark_is_the_default_and_light_adds_its_palette():
+    assert css_for("dark") == CSS and css_for() == CSS and css_for("nonsense") == CSS
+    light = css_for("light")
+    assert light.startswith(CSS) and light.endswith(LIGHT_CSS)
+    for key in ("bg", "card", "text", "muted", "border"):
+        assert LIGHT_TOKENS[key] in LIGHT_CSS
+    assert LIGHT_TOKENS["bg"] != TOKENS["bg"] and LIGHT_TOKENS["text"] != TOKENS["text"]
+
+
+def test_dark_css_has_no_fixed_button_colours_left():
+    assert "#1e2230 !important" not in CSS and "var(--sf-btn-bg)" in CSS

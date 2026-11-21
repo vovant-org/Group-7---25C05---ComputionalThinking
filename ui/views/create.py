@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import streamlit as st
 
+from modules.video.render import QUALITY_PROFILES
 from modules.voice_library.language import detect_language
 from modules.voice_library.library import LANGUAGES
 from ui import components as C
@@ -88,7 +89,7 @@ def _start() -> None:
         pack=ss["pack"] if ss["source"] == "demo" else None, fmt=ss["fmt"], t_target=int(ss["duration"]),
         budget=None if ss["auto_budget"] else int(ss["budget"]), voice_id=ss[f"voice_{lang}"], speed=float(ss["speed"]),
         engine_kind=ss["engine"], allow_online=bool(ss["allow_online"]), subtitles=ss["subtitles"],
-        topic_aware=bool(ss["topic_aware"]), language=lang)
+        topic_aware=bool(ss["topic_aware"]), language=lang, quality=ss["quality"])
     ss["gen_state"] = "running"
     ss["last_outcome"] = None
     ss["view"] = "generate"
@@ -172,8 +173,7 @@ def _step_content(ctx: dict) -> None:
                      placeholder="Or paste the text here. Use full sentences of 8–24 words. The video is built only from this text; "
                                  "StoryFrame cannot research a topic by itself yet.")
         words = count_words(ss["topic"]) + count_words(ss["reference"])
-        st.markdown(f"<div style='text-align:right;font-size:.78rem;color:{'#F87171' if words > MAX_WORDS else '#94A3B8'}'>"
-                    f"{words:,} / {MAX_WORDS:,} words</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='sf-count{' over' if words > MAX_WORDS else ''}'>{words:,} / {MAX_WORDS:,} words</div>", unsafe_allow_html=True)
 
         html(C.section("No material yet? Try a ready-made example"))
         demos = runner.demo_templates()
@@ -236,7 +236,11 @@ def _step_budget(ctx: dict) -> None:
     if not ss["auto_budget"]:
         st.number_input("Maximum credits", 1, 1000, key=S.seed("budget"), on_change=S.sync, args=("budget",), step=1)
 
-    with st.expander("More options (duration, subtitles, speed, voice engine)"):
+    with st.expander("More options (video quality, duration, subtitles, speed, voice engine)"):
+        st.radio("Video quality", list(runner.QUALITY_LABELS), key=S.seed("quality"), on_change=S.sync, args=("quality",), horizontal=True,
+                 format_func=runner.QUALITY_LABELS.get,
+                 help="\n\n".join(f"{k}: {v}" for k, v in runner.QUALITY_HELP.items()))
+        st.caption(QUALITY_PROFILES[ss["quality"]].note)
         st.slider("Duration (seconds)", 60, 120, key=S.seed("duration"), on_change=S.sync, args=("duration",), step=5,
                   help="The video must last 60–120 s. The result may miss the target by at most 5 %.")
         st.radio("Subtitles", list(runner.SUBTITLE_MODES), key=S.seed("subtitles"), on_change=S.sync, args=("subtitles",), horizontal=True,
@@ -267,7 +271,7 @@ def _step_budget(ctx: dict) -> None:
     html(C.section("Your video"))
     voice = ctx["lib"].get(ss[f"voice_{lang}"])
     html(C.badges([(short_title(ss["topic"], 48) or "—", "accent"), (ss["fmt"].title(), "info"), (voice.name, "neutral"),
-                   (f"{int(ss['duration'])} s", "neutral")]))
+                   (f"{int(ss['duration'])} s", "neutral"), (runner.QUALITY_LABELS[ss["quality"]], "neutral")]))
     html(C.budget_card(est))
     _alerts(msgs)
     blocked = has_blocking(msgs) or not est.get("can_start")

@@ -23,6 +23,7 @@ from modules.providers import edge_tts_provider as tts_engine
 from modules.router.router import Request
 from modules.video.claims import claims_from_text
 from modules.video.make_video import UNAVAILABLE_MODES, make_video
+from modules.video.render import DEFAULT_QUALITY, QUALITY_PROFILES
 from modules.video.voice import FFmpegMissing, find_ffmpeg, make_engine
 from modules.voice_library.language import detect_language
 from modules.voice_library.library import (SPEED_MAX, SPEED_MIN, VoiceLibrary, VoiceLibraryError, builtin_library,
@@ -38,6 +39,8 @@ SUBTITLE_MODES = {"burn": "On the video", "track": "Separate track", "off": "Off
 SUBTITLE_HELP = {"burn": "Burned into the picture and also saved as a track.",
                  "track": "Not drawn on the picture; a subtitle track in the file that players can switch on.",
                  "off": "Not in the video. The .srt file is still saved next to it."}
+QUALITY_LABELS = {k: f"{q.label} · {q.size[1]}p" for k, q in QUALITY_PROFILES.items()}
+QUALITY_HELP = {q.label: q.note for q in QUALITY_PROFILES.values()}
 BUILT_FORMATS = (OutputFormat.INFOGRAPHIC, OutputFormat.ANIMATION)     # HYBRID: not built in the backend
 
 
@@ -155,6 +158,7 @@ class GenParams:
     subtitles: str                   # burn | track | off
     topic_aware: bool
     language: str
+    quality: str = DEFAULT_QUALITY         # draft | standard | high (output size and bitrate; see modules/video/render.py)
 
 
 @dataclass
@@ -180,7 +184,7 @@ def _record(p: GenParams, pid: str, voice, engine_name: str, res, facts: dict, n
         "voice": {"id": voice.voice_id, "name": voice.name, "speed": f"×{p.speed:g}", "engine": engine_label(p.engine_kind),
                   "engine_id": engine_name},
         "requested": {"format": p.fmt, "t_target": p.t_target, "budget": p.budget},
-        "options": {"subtitles": p.subtitles, "topic_aware": p.topic_aware},
+        "options": {"subtitles": p.subtitles, "topic_aware": p.topic_aware, "quality": p.quality},
         "pipeline": facts,
         "claims": [{"claim_id": c.claim_id, "text": c.text, "facet": c.facet, "importance": c.importance}
                    for c in (pr.selection.claims if pr.selection else [])],
@@ -205,12 +209,13 @@ def generate(p: GenParams, progress: Optional[Callable[[float, str], None]] = No
         return Outcome(False, error="No usable sentence (8–24 words) was found in the reference material.")
     text = request_text(p.topic, p.instructions)
     pid = storage.project_key(text, p.reference, p.source, p.pack, p.fmt, p.t_target, p.budget, p.voice_id, p.speed,
-                              engine.name, p.subtitles, p.topic_aware)
+                              engine.name, p.subtitles, p.topic_aware,
+                              *(() if p.quality == DEFAULT_QUALITY else (p.quality,)))      # default keeps the ids of older videos
     out = storage.videos_dir() / f"{pid}.mp4"
     res = make_video(text, claims, out, engine=engine, voice=voice, speed=p.speed,
                      reference_text=p.reference if p.source == "text" else "", t_target=p.t_target, budget=p.budget,
                      output_format=OutputFormat(p.fmt), burn_subtitles=p.subtitles == "burn",
-                     soft_subtitles=p.subtitles != "off", visual_engine=p.topic_aware, progress=progress)
+                     soft_subtitles=p.subtitles != "off", visual_engine=p.topic_aware, progress=progress, quality=p.quality)
     facts = facts_from_pipeline(res.pipeline, len(claims))
     silent = bool(res.report.get("voice_is_silent")) if res.ok else None
     if not res.ok:

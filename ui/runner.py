@@ -159,6 +159,10 @@ class GenParams:
     topic_aware: bool
     language: str
     quality: str = DEFAULT_QUALITY         # draft | standard | high (output size and bitrate; see modules/video/render.py)
+    ai_read: str = "off"                   # off | pollinations | gemini: an LLM reads the input and writes claims + picture prompts
+    ai_image: str = "off"                  # off | pollinations | folder: an AI picture of each claim (INFOGRAPHIC only)
+    ai_online: bool = False                # the user confirmed that text is sent to an online AI service
+    ai_folder: str = ""                    # folder of hand-made pictures for ai_image == "folder"
 
 
 @dataclass
@@ -184,7 +188,8 @@ def _record(p: GenParams, pid: str, voice, engine_name: str, res, facts: dict, n
         "voice": {"id": voice.voice_id, "name": voice.name, "speed": f"×{p.speed:g}", "engine": engine_label(p.engine_kind),
                   "engine_id": engine_name},
         "requested": {"format": p.fmt, "t_target": p.t_target, "budget": p.budget},
-        "options": {"subtitles": p.subtitles, "topic_aware": p.topic_aware, "quality": p.quality},
+        "options": {"subtitles": p.subtitles, "topic_aware": p.topic_aware, "quality": p.quality,
+                    **({"ai_read": p.ai_read, "ai_image": p.ai_image} if (p.ai_read, p.ai_image) != ("off", "off") else {})},
         "pipeline": facts,
         "claims": [{"claim_id": c.claim_id, "text": c.text, "facet": c.facet, "importance": c.importance}
                    for c in (pr.selection.claims if pr.selection else [])],
@@ -205,17 +210,34 @@ def generate(p: GenParams, progress: Optional[Callable[[float, str], None]] = No
     except Exception as exc:                                   # missing package, online not confirmed, ...
         return Outcome(False, error=f"Voice engine: {exc}")
     claims = build_claims(p.source, p.pack, p.reference)
-    if not claims:
-        return Outcome(False, error="No usable sentence (8–24 words) was found in the reference material.")
     text = request_text(p.topic, p.instructions)
+    ai = None
+    if (p.ai_read, p.ai_image) != ("off", "off"):
+        from modules.ai.net import AIError
+        from modules.ai.reader import claims_for_duration
+        from modules.ai.setup import prepare_ai
+        try:
+            ai = prepare_ai(text, p.reference if p.source == "text" else "", claims, read_kind=p.ai_read,
+                            image_kind=p.ai_image if p.fmt == "INFOGRAPHIC" else "off",
+                            folder=Path(p.ai_folder) if p.ai_folder else None, allow_online=p.ai_online,
+                            n_scenes=claims_for_duration(p.t_target), cache_dir=storage.videos_dir().parent / "ai_cache")
+        except AIError as exc:
+            return Outcome(False, error=f"AI: {exc}")
+        if ai.claims:
+            claims = ai.claims
+    if not claims:
+        return Outcome(False, error="No usable sentence (8–24 words) was found in the reference material."
+                       + (" " + " ".join(ai.notes) if ai and ai.notes else ""))
     pid = storage.project_key(text, p.reference, p.source, p.pack, p.fmt, p.t_target, p.budget, p.voice_id, p.speed,
                               engine.name, p.subtitles, p.topic_aware,
-                              *(() if p.quality == DEFAULT_QUALITY else (p.quality,)))      # default keeps the ids of older videos
+                              *(() if p.quality == DEFAULT_QUALITY else (p.quality,)),      # default keeps the ids of older videos
+                              *(() if ai is None else (p.ai_read, p.ai_image, " ".join(c.text for c in claims))))
     out = storage.videos_dir() / f"{pid}.mp4"
     res = make_video(text, claims, out, engine=engine, voice=voice, speed=p.speed,
                      reference_text=p.reference if p.source == "text" else "", t_target=p.t_target, budget=p.budget,
                      output_format=OutputFormat(p.fmt), burn_subtitles=p.subtitles == "burn",
-                     soft_subtitles=p.subtitles != "off", visual_engine=p.topic_aware, progress=progress, quality=p.quality)
+                     soft_subtitles=p.subtitles != "off", visual_engine=p.topic_aware, progress=progress, quality=p.quality,
+                     art=ai.art if ai else None, visuals=ai.visuals if ai else None)
     facts = facts_from_pipeline(res.pipeline, len(claims))
     silent = bool(res.report.get("voice_is_silent")) if res.ok else None
     if not res.ok:

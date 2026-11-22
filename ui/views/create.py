@@ -89,7 +89,8 @@ def _start() -> None:
         pack=ss["pack"] if ss["source"] == "demo" else None, fmt=ss["fmt"], t_target=int(ss["duration"]),
         budget=None if ss["auto_budget"] else int(ss["budget"]), voice_id=ss[f"voice_{lang}"], speed=float(ss["speed"]),
         engine_kind=ss["engine"], allow_online=bool(ss["allow_online"]), subtitles=ss["subtitles"],
-        topic_aware=bool(ss["topic_aware"]), language=lang, quality=ss["quality"])
+        topic_aware=bool(ss["topic_aware"]), language=lang, quality=ss["quality"],
+        ai_read=ss["ai_read"], ai_image=ss["ai_image"], ai_online=bool(ss["ai_online"]), ai_folder=ss["ai_folder"].strip())
     ss["gen_state"] = "running"
     ss["last_outcome"] = None
     ss["view"] = "generate"
@@ -126,9 +127,12 @@ def _validate(ctx: dict, *, final: bool) -> list[dict]:
     ss = st.session_state
     kw = dict(topic=ss["topic"], instructions=ss["instructions"] if final else "",
               reference=ss["reference"] if ss["source"] == "text" else "", source=ss["source"], claims_text=ctx["ctexts"],
-              voice_language=ss["language"], upload_error=ss["upload_error"], detected_language=ctx["detected"])
+              voice_language=ss["language"], upload_error=ss["upload_error"], detected_language=ctx["detected"],
+              ai_reads=ss["ai_read"] != "off")
     if final:
-        return validate_inputs(ffmpeg_ok=runner.ffmpeg_ok(), online_ok=bool(ss["allow_online"]), engine_kind=ss["engine"], **kw)
+        needs = ss["ai_read"] != "off" or ss["ai_image"] == "pollinations"
+        return validate_inputs(ffmpeg_ok=runner.ffmpeg_ok(), online_ok=bool(ss["allow_online"]), engine_kind=ss["engine"],
+                               ai_online_needed=needs, ai_online_ok=bool(ss["ai_online"]), **kw)
     return validate_inputs(ffmpeg_ok=True, online_ok=True, engine_kind="system", **kw)
 
 
@@ -256,6 +260,21 @@ def _step_budget(ctx: dict) -> None:
                 html(C.alert("warn", "edge-tts is not installed", "Run  pip install edge-tts  or choose another engine."))
             st.checkbox("I understand the narration text is sent to an online service", key=S.seed("allow_online"), on_change=S.sync,
                         args=("allow_online",), help="Do not send private or sensitive text (report R7 / AI tool policy).")
+        st.markdown("**AI (free)**")
+        st.radio("AI reads my input", ["off", "pollinations", "gemini"], key=S.seed("ai_read"), on_change=S.sync, args=("ai_read",), horizontal=True,
+                 format_func={"off": "Off", "pollinations": "Pollinations (no key)", "gemini": "Gemini (free key)"}.get,
+                 help="An AI reads your topic and material, picks the claims and describes one picture per scene. With reference text, "
+                      "every claim must come from your text (the app checks this). Gemini needs the GEMINI_API_KEY environment variable.")
+        if ss["fmt"] == "INFOGRAPHIC":
+            st.radio("AI picture of each claim", ["off", "pollinations", "folder"], key=S.seed("ai_image"), on_change=S.sync, args=("ai_image",),
+                     horizontal=True, format_func={"off": "Off", "pollinations": "Pollinations (free, slow)", "folder": "My own pictures"}.get,
+                     help="Pollinations: about one picture per 15 s. My own pictures: make them in Google Flow / ImageFX and save them as "
+                          "<claim id>.png in a folder (the prompt kit comes from the command line: --export-kit). Text on screen is still drawn by code.")
+            if ss["ai_image"] == "folder":
+                st.text_input("Folder with the pictures", key=S.seed("ai_folder"), on_change=S.sync, args=("ai_folder",))
+        if ss["ai_read"] != "off" or (ss["fmt"] == "INFOGRAPHIC" and ss["ai_image"] == "pollinations"):
+            st.checkbox("I understand my text is sent to an online AI service", key=S.seed("ai_online"), on_change=S.sync, args=("ai_online",),
+                        help="Do not send private or sensitive text.")
         if ss["fmt"] == "ANIMATION":
             st.checkbox("Topic-aware visuals", key=S.seed("topic_aware"), on_change=S.sync, args=("topic_aware",),
                         help="On: objects and motion follow the topic. Off: the generic stick figure with six standard props.")
@@ -268,6 +287,9 @@ def _step_budget(ctx: dict) -> None:
         facts = _cached_estimate(ss["topic"], ss["instructions"], ss["reference"], ss["source"], ss["pack"], ss["fmt"], int(ss["duration"]),
                                  None if ss["auto_budget"] else int(ss["budget"]), ss[f"voice_{lang}"], float(ss["speed"]))
     est = estimate_from_facts(facts)
+    if facts is None and ss["topic"].strip() and ss["ai_read"] != "off" and ss["source"] == "text" and not ss["reference"].strip():
+        est = {"status_key": "pending", "status_text": "Estimated after the AI reads your topic", "can_start": True,
+               "blocking": False, "messages": ["The cost is planned after the AI has written the claims."]}
     html(C.section("Your video"))
     voice = ctx["lib"].get(ss[f"voice_{lang}"])
     html(C.badges([(short_title(ss["topic"], 48) or "—", "accent"), (ss["fmt"].title(), "info"), (voice.name, "neutral"),

@@ -70,5 +70,30 @@ features: `docs/ui-redesign.md`.
 | modules/visual_engine | Topic-aware Visual Engine for ANIMATION: topic analysis, per-domain kits, content-aware motion, word-level sync, quality checks (docs/topic-aware-visual-engine.md) |
 | narration script generator, real providers, REASON step | TODO |
 
+## AI integration (free, optional) – INFOGRAPHIC
+An AI **reads your input** (topic and/or reference text), chooses the claims, and describes one picture that shows exactly each claim.
+An image model draws that picture; the claim is still drawn **by code** next to it, so every word on screen comes from the claim (S15).
+Any failure falls back, scene by scene, to the drawn infographic. Code: `modules/ai/` (tests: `tests/test_ai.py`, no network needed).
+
+    # 1) AI reads the input + free AI picture per scene (online: needs --allow-online; Pollinations needs no key)
+    python -m modules.video.make_video "Make a 90-second infographic video about sleep" --reference notes.txt \
+        --ai-read pollinations --ai-image pollinations --allow-online
+    # 2) topic only (no reference text): the AI writes the claims; they are NOT verified and contain no digits
+    python -m modules.video.make_video "Make a 90-second infographic video about why we sleep" --ai-read pollinations --ai-image pollinations --allow-online
+    # 3) pictures made by hand in Google Flow / ImageFX / Gemini app (free): export prompts, save <claim_id>.png, render
+    python -m modules.video.make_video "..." --reference notes.txt --ai-read gemini --ai-image folder --ai-folder kit --export-kit
+    python -m modules.video.make_video "..." --reference notes.txt --ai-read gemini --ai-image folder --ai-folder kit
+
+| Option | Cost / key | Notes |
+|---|---|---|
+| `--ai-read pollinations` | free, no key | anonymous tier, rate limited; your text is sent to Pollinations |
+| `--ai-read gemini` | free key from Google AI Studio in `GEMINI_API_KEY` (`GEMINI_TEXT_MODEL` to change model) | free tier may use prompts to improve Google products |
+| `--ai-image pollinations` | free, no key | about one picture per 15 s (12 scenes ~ 3 min); pictures are cached in `outputs/ai_cache/` |
+| `--ai-image folder` | free (hand-made) | Google Flow / ImageFX / Gemini app have no free API; `--export-kit` writes `prompts.md` |
+
+Checks: with reference text a claim is kept only if >= 85 % of its words are in your text; topic-only claims are marked unverified
+and rejected if they contain a digit. UI: *More options -> AI (free)*. ANIMATION does not use AI pictures yet.
+Record this in `docs/team-contributions.md` ("Record of AI tool use") and verify the pictures before submitting.
+
 ## For team members
 Read `docs/team-brief-next-steps.md`; if you use an AI assistant, start from `docs/ai-assistant-prompt.md`.

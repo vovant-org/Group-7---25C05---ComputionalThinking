@@ -195,7 +195,8 @@ def stage_view(facts: Optional[dict], *, video_ok: Optional[bool] = None, criter
 # ----------------------------------------------------------------------------------- input validation
 def validate_inputs(*, topic: str, instructions: str, reference: str, source: str, claims_text: Sequence[str],
                     voice_language: str, ffmpeg_ok: bool, upload_error: str = "", online_ok: bool = True,
-                    engine_kind: str = "silent", detected_language=None) -> list[dict]:
+                    engine_kind: str = "silent", detected_language=None, ai_reads: bool = False,
+                    ai_online_needed: bool = False, ai_online_ok: bool = True) -> list[dict]:
     """Messages shown under the composer: [{level: err|warn|info, title, text}]. Any `err` blocks Create Video."""
     msgs: list[dict] = []
 
@@ -212,7 +213,11 @@ def validate_inputs(*, topic: str, instructions: str, reference: str, source: st
     if words > MAX_WORDS:
         add("err", f"Too long: {words:,} words (limit {MAX_WORDS:,})", "Shorten the topic or the reference material. Nothing is cut silently.")
     if source == "text":
-        if not reference.strip():
+        if not reference.strip() and ai_reads:
+            add("info", "The AI will write the claims from your topic",
+                "Without reference text the claims are written by the AI and are NOT verified. Paste your own material for a video "
+                "whose every sentence comes from your text.")
+        elif not reference.strip():
             add("err", "Add reference material", "StoryFrame builds the story from text you provide. It cannot research a topic by itself yet "
                                                    "(the REASON step is not built). Paste text or upload a .txt / .md file, or pick a demo template.")
         elif not claims_text:
@@ -222,6 +227,8 @@ def validate_inputs(*, topic: str, instructions: str, reference: str, source: st
             f"The content looks like “{detected_language}” but the selected voice speaks “{voice_language}”. Switch the narration language or the voice.")
     if engine_kind == "edge" and not online_ok:
         add("err", "Confirm the online voice", "The Edge voice sends the narration text to an online service. Tick the confirmation or choose another engine.")
+    if ai_online_needed and not ai_online_ok:
+        add("err", "Confirm the online AI", "The selected AI option sends your text to an online service. Tick the confirmation or switch it off.")
     if engine_kind == "silent":
         add("info", "Silent video", "The video will have a timed but silent audio track. Choose a system or Edge voice to hear narration.")
     return msgs

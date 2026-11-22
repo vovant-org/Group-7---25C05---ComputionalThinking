@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 from core.models import Label, Scene
 from modules.video import labels as L
@@ -87,6 +87,7 @@ class ComposedScene:
     claim_text: str = ""
     warnings: list[str] = field(default_factory=list)
     overflow: bool = False                  # True when text still did not fit after K1 -> K3 -> K2
+    has_art: bool = False                   # True when an AI picture of the claim is on screen (layout ai_visual)
     base_arr: np.ndarray = field(init=False, repr=False)
 
     def __post_init__(self):
@@ -355,9 +356,33 @@ def _trend_chart(chunks, st: Style, accent, claim_text="", **_) -> _Built:
     return _Built([el_chart, _crop(img2, _words(chunks[0]), chunks[0])], [] if ok else [1], size)
 
 
+ART_W = 500
+
+
+def _ai_visual(chunks, st: Style, accent, art: Optional[Image.Image] = None, **_) -> _Built:
+    """AI picture of the claim on the left, the claim itself (text drawn by code) on the right."""
+    x0, y0, x1, y1 = st.area
+    top, bot = y0 + 10, y1 - 10
+    box = (x0, top, x0 + ART_W, bot)
+    w, h = box[2] - box[0], box[3] - box[1]
+    img, d = _layer(st)
+    d.rounded_rectangle((box[0] + 5, box[1] + 7, box[2] + 5, box[3] + 7), 22, fill=(20, 30, 60, 40))
+    pic = ImageOps.fit(art.convert("RGB"), (w, h), Image.LANCZOS, centering=(0.5, 0.45)).convert("RGBA")
+    mask = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, w - 1, h - 1), 22, fill=255)
+    img.paste(pic, (box[0], box[1]), mask)
+    d.rounded_rectangle(box, 22, outline=accent + (255,), width=4)
+    el_pic = _crop(img, 1, "")
+    img2, d2 = _layer(st)
+    tbox = (x0 + ART_W + 40, top, x1, bot)
+    _card(d2, tbox, st, accent)
+    size, ok = _text_box(d2, chunks[0], tbox, st, start=40, pad=34)
+    return _Built([el_pic, _crop(img2, _words(chunks[0]), chunks[0])], [] if ok else [0], size)
+
+
 _LAYOUT_FN: dict[str, Callable[..., _Built]] = {
     "cause_chain": _cause_chain, "compare_2col": _compare_2col, "steps": _steps, "loop": _loop,
-    "big_number": _big_number, "trend_chart": _trend_chart}
+    "big_number": _big_number, "trend_chart": _trend_chart, "ai_visual": _ai_visual}
 
 
 # ------------------------------------------------------------------ choosing layout and chunks
@@ -410,12 +435,16 @@ def draw_base(st: Style, facet: str, index: int, total: int, accent: tuple) -> I
 
 # ------------------------------------------------------------------ public API
 def compose_scene(scene: Scene, claim_text: str, st: Style = Style(), index: int = 0,
-                  total: int = 1) -> ComposedScene:
-    """Draw the scene. Text comes only from `claim_text`; labels list exactly what was drawn."""
-    layout, note = resolve_layout(scene.layout, claim_text)
+                  total: int = 1, art: Optional[Image.Image] = None) -> ComposedScene:
+    """Draw the scene. Text comes only from `claim_text`; labels list exactly what was drawn.
+    `art`: an AI picture of the claim (modules/ai). With it the scene uses the `ai_visual` layout."""
+    if art is not None:
+        layout, note = "ai_visual", ""
+    else:
+        layout, note = resolve_layout(scene.layout, claim_text)
     warnings = [note] if note else []
     accent = st.accent(scene.facet)
-    chunks = initial_chunks(layout, claim_text)
+    chunks = [L.clean_chunk(claim_text)] if art is not None else initial_chunks(layout, claim_text)
     if layout == "loop" and len(chunks) < 3:                 # a loop needs three natural parts
         layout = "cause_chain"
         chunks = initial_chunks(layout, claim_text)
@@ -423,7 +452,7 @@ def compose_scene(scene: Scene, claim_text: str, st: Style = Style(), index: int
     fn = _LAYOUT_FN[layout]
     max_k = MAX_CHUNKS.get(layout, 1)
 
-    built = fn(chunks, st, accent, claim_text=claim_text)
+    built = fn(chunks, st, accent, claim_text=claim_text, art=art)
     for _ in range(2):                                      # K3: split an overflowing label (at most 2 retries)
         if not built.overflow or len(chunks) >= max_k or layout in ("big_number", "trend_chart"):
             break
@@ -433,13 +462,13 @@ def compose_scene(scene: Scene, claim_text: str, st: Style = Style(), index: int
             break
         chunks = chunks[:i] + parts + chunks[i + 1:]
         warnings.append(f"K3: split an overflowing label into {len(parts)} steps")
-        built = fn(chunks, st, accent, claim_text=claim_text)
+        built = fn(chunks, st, accent, claim_text=claim_text, art=art)
     shrink = 0
     while built.overflow and shrink < 8:                    # K2: last resort, shorten (still a prefix of the claim)
         i = built.overflow[0]
         chunks[i] = L.shorten_to_words(chunks[i], max(3, len(chunks[i].split()) - 2))
         shrink += 1
-        built = fn(chunks, st, accent, claim_text=claim_text)
+        built = fn(chunks, st, accent, claim_text=claim_text, art=art)
         if shrink == 1:
             warnings.append("K2: shortened a label that did not fit at the minimum font")
     overflow = bool(built.overflow)
@@ -457,7 +486,7 @@ def compose_scene(scene: Scene, claim_text: str, st: Style = Style(), index: int
     return ComposedScene(scene_id=scene.scene_id, layout=layout, requested_layout=scene.layout,
                          base=draw_base(st, scene.facet, index, total, accent), elements=elements,
                          labels=[Label(t, cid) for t in shown if t], min_font_used=built.min_font,
-                         claim_text=claim_text, warnings=warnings, overflow=overflow)
+                         claim_text=claim_text, warnings=warnings, overflow=overflow, has_art=art is not None)
 
 
 def static_frame(cs: ComposedScene) -> np.ndarray:

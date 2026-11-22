@@ -29,7 +29,7 @@ import sys
 import tempfile
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Callable, Optional, Sequence
+from typing import Callable, Mapping, Optional, Sequence
 
 from core.config import OUTPUT_DIR, PROFILES, VOICE_WPM
 from core.models import MOTION_MODES, OutputFormat, RenderMode
@@ -159,7 +159,7 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
                soft_subtitles: bool = True, render: bool = True, work_dir: Optional[Path] = None,
                style: Style = Style(), progress: Optional[Callable[[float, str], None]] = None,
                max_adjustments: int = MAX_ADJUSTMENTS, visual_engine: bool = True,
-               quality: str = DEFAULT_QUALITY) -> VideoResult:
+               quality: str = DEFAULT_QUALITY, art=None, visuals: Optional[Mapping[str, str]] = None) -> VideoResult:
     out_path = Path(out_path)
     if work_dir is None:                                  # dry run: scratch space only, nothing left behind
         work_dir = out_path.parent / (out_path.stem + "_work") if render else Path(tempfile.mkdtemp(prefix="sfs_"))
@@ -205,7 +205,14 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
     fmt = res.decision.fmt
     total_scenes = len(res.scenes)
     if fmt == OutputFormat.INFOGRAPHIC:
-        composed: dict = {s.scene_id: compose_scene(s, s.narration, style, i, total_scenes)
+        pictures: dict = {}                         # AI pictures (modules/ai): one per scene, made from the claim itself
+        if art is not None and visuals:
+            for i, s in enumerate(res.scenes):
+                cid = s.claim_ids[0] if s.claim_ids else ""
+                if progress:
+                    progress(0.0, f"AI picture {i + 1}/{total_scenes}")
+                pictures[s.scene_id] = art.get(cid, visuals[cid]) if cid in visuals else None
+        composed: dict = {s.scene_id: compose_scene(s, s.narration, style, i, total_scenes, art=pictures.get(s.scene_id))
                           for i, s in enumerate(res.scenes)}
         problems = [p for cs in composed.values() for p in check_labels(cs)]
     elif fmt == OutputFormat.ANIMATION:
@@ -232,6 +239,13 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
 
     report = build_report(res, composed, problems, engine, state, log, style, fps, measured_s, render_info,
                           out_path if render else None)
+    if art is not None and fmt == OutputFormat.INFOGRAPHIC:
+        report["ai_images"] = art.summary(total_scenes)
+        report["notes"] = report.get("notes", []) + [
+            f"AI pictures: {report['ai_images']['scenes_with_image']} of {total_scenes} scenes "
+            f"({art.provider.name}); the other scenes are drawn by code. All text is still drawn by code from the claims."]
+    elif art is not None:
+        report["notes"] = report.get("notes", []) + ["AI pictures are used for INFOGRAPHIC only; this video is not INFOGRAPHIC."]
     if fmt == OutputFormat.ANIMATION and visual_engine:
         from modules.visual_engine.quality import run_quality
         q = run_quality(composed, res.timeline, style, t_target=res.timeline.t_target, video=out_path if render else None,
@@ -329,18 +343,60 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--quality", choices=list(QUALITY_PROFILES), default=DEFAULT_QUALITY,
                     help="output quality: draft 480p / standard 720p (default) / high 1080p")
     ap.add_argument("--dry-run", action="store_true", help="plan, compose and check everything but write no video")
+    ap.add_argument("--ai-read", choices=["off", "pollinations", "gemini"], default="off",
+                    help="an LLM reads your topic / reference text and writes the claims and a picture description per scene "
+                         "(online: your text is sent to the provider; needs --allow-online). gemini needs GEMINI_API_KEY (free key)")
+    ap.add_argument("--ai-image", choices=["off", "pollinations", "folder"], default="off",
+                    help="AI picture of each claim (INFOGRAPHIC). pollinations = free, online; folder = pictures you made by hand "
+                         "in Google Flow / ImageFX named <claim_id>.png (see --ai-folder)")
+    ap.add_argument("--ai-folder", type=Path, default=None, help="folder for --ai-image folder, and where the prompt kit is written")
+    ap.add_argument("--export-kit", action="store_true", help="write prompts.md/json (one prompt per scene) to --ai-folder and stop")
     ap.add_argument("--no-visual-engine", action="store_true", help="ANIMATION: use the generic stick-figure animation")
     a = ap.parse_args(argv)
 
     reference = a.reference.read_text(encoding="utf-8") if a.reference else ""
+    claims, lang = [], "en"
     if a.pack:
         claims, lang = get_sample_claims(a.pack), pack_language(a.pack)
     elif reference:
         claims = claims_from_text(reference)
         from modules.voice_library.language import detect_language
         lang = detect_language(reference) or "en"
+    elif a.ai_read == "off":
+        ap.error("give --pack or --reference (or --ai-read to let an AI write the claims from the request)")
     else:
-        ap.error("give --pack or --reference")
+        from modules.voice_library.language import detect_language
+        lang = detect_language(a.request) or "en"
+    ai = None
+    if a.ai_read != "off" or a.ai_image != "off" or a.export_kit:
+        from modules.ai.net import AIError
+        import re
+        from modules.ai.reader import claims_for_duration
+        from modules.ai.setup import prepare_ai, write_kit
+        m = re.search(r"(\d{2,3})\s*[- ]?\s*(?:second|sec|s\b|giây)", a.request, re.I)
+        seconds = min(120, max(60, int(m.group(1)))) if m else 90          # the duration the Router will read from the request
+        try:
+            ai = prepare_ai(a.request, reference if not a.pack else "", claims, read_kind=a.ai_read,
+                            image_kind=a.ai_image, folder=a.ai_folder, allow_online=a.allow_online,
+                            n_scenes=claims_for_duration(seconds))
+        except AIError as exc:
+            print(f"AI error: {exc}", file=sys.stderr)
+            return 2
+        for n in ai.notes:
+            print("  ai:", n)
+        if ai.claims:
+            claims = ai.claims
+            if lang == "en":
+                from modules.voice_library.language import detect_language
+                lang = detect_language(" ".join(c.text for c in claims)) or lang
+        if not claims:
+            print("FAILED: the AI reader produced no usable claims and there is no reference text", file=sys.stderr)
+            return 1
+        if a.export_kit:
+            if a.ai_folder is None:
+                ap.error("--export-kit needs --ai-folder")
+            print("prompt kit written to", write_kit(claims, ai.visuals or {}, a.ai_folder))
+            return 0
     lib = load_library()
     voice = lib.get(a.voice_id) if a.voice_id else lib.default(lang)
     planning_wpm = voice.planning_wpm(a.speed)
@@ -356,6 +412,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     last = {"pct": -1}
 
     def show(frac: float, msg: str) -> None:
+        if msg.startswith("AI picture"):                           # slow (up to 45 s each on the free tier): show every one
+            print(f"  {msg} ...", flush=True)
+            return
         pct = int(frac * 100)
         if sys.stdout.isatty():
             print(f"\r  rendering {pct:3d}%  {msg:<18}", end="", flush=True)
@@ -365,7 +424,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     r = make_video(a.request, claims, out, engine=engine, voice=voice, speed=a.speed, reference_text=reference,
                    fps=a.fps, burn_subtitles=not a.no_burn, soft_subtitles=not a.no_soft_subs,
-                   render=not a.dry_run, progress=show, visual_engine=not a.no_visual_engine, quality=a.quality)
+                   render=not a.dry_run, progress=show, visual_engine=not a.no_visual_engine, quality=a.quality,
+                   art=ai.art if ai else None, visuals=ai.visuals if ai else None)
     print()
     for line in r.log:
         print("  adjust:", line)
@@ -377,6 +437,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"scenes {r.report['scenes']}, {r.report['total_s']} s" + (f"  ->  {r.video_path}" if r.video_path else "  (dry run)"))
     for note in r.report["notes"][:3]:
         print("  note:", note)
+    for err in r.report.get("ai_images", {}).get("errors", [])[:3]:
+        print("  ai error:", err[:240])
     return 0
 
 

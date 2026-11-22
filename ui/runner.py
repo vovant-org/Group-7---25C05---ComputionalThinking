@@ -200,7 +200,8 @@ def _record(p: GenParams, pid: str, voice, engine_name: str, res, facts: dict, n
     }
 
 
-def generate(p: GenParams, progress: Optional[Callable[[float, str], None]] = None) -> Outcome:
+def generate(p: GenParams, progress: Optional[Callable[[float, str], None]] = None,
+             on_stage: Optional[Callable[[str, str, str], None]] = None) -> Outcome:
     """Build the video with the existing `make_video` (the same call the original page made)."""
     t0 = time.time()
     lib, _ = load_voices()
@@ -216,6 +217,8 @@ def generate(p: GenParams, progress: Optional[Callable[[float, str], None]] = No
         from modules.ai.net import AIError
         from modules.ai.reader import claims_for_duration
         from modules.ai.setup import prepare_ai
+        if on_stage:
+            on_stage("ai_read", "start", "The AI is reading your input and writing claims…" if p.ai_read != "off" else "Preparing the AI pictures…")
         try:
             ai = prepare_ai(text, p.reference if p.source == "text" else "", claims, read_kind=p.ai_read,
                             image_kind=p.ai_image if p.fmt == "INFOGRAPHIC" else "off",
@@ -237,7 +240,7 @@ def generate(p: GenParams, progress: Optional[Callable[[float, str], None]] = No
                      reference_text=p.reference if p.source == "text" else "", t_target=p.t_target, budget=p.budget,
                      output_format=OutputFormat(p.fmt), burn_subtitles=p.subtitles == "burn",
                      soft_subtitles=p.subtitles != "off", visual_engine=p.topic_aware, progress=progress, quality=p.quality,
-                     art=ai.art if ai else None, visuals=ai.visuals if ai else None)
+                     art=ai.art if ai else None, visuals=ai.visuals if ai else None, on_stage=on_stage)
     facts = facts_from_pipeline(res.pipeline, len(claims))
     silent = bool(res.report.get("voice_is_silent")) if res.ok else None
     if not res.ok:

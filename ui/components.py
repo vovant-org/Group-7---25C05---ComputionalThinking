@@ -337,7 +337,7 @@ def stepper(labels: Sequence[str], current: int) -> str:
     for i, label in enumerate(labels, start=1):
         state = "done" if i < current else ("on" if i == current else "")
         mark = icon("check", 13, 2.8) if i < current else str(i)
-        parts.append(f'<div class="sf-step {state}"><span class="n">{mark}</span><span class="l">{esc(label)}</span></div>')
+        parts.append(f'<div class="sf-wiz-step {state}"><span class="n">{mark}</span><span class="l">{esc(label)}</span></div>')
         if i < len(labels):
-            parts.append('<div class="sf-step-line"></div>')
-    return f'<div class="sf-steps">{"".join(parts)}</div>'
+            parts.append('<div class="sf-wiz-line"></div>')
+    return f'<div class="sf-wiz">{"".join(parts)}</div>'

@@ -159,7 +159,8 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
                soft_subtitles: bool = True, render: bool = True, work_dir: Optional[Path] = None,
                style: Style = Style(), progress: Optional[Callable[[float, str], None]] = None,
                max_adjustments: int = MAX_ADJUSTMENTS, visual_engine: bool = True,
-               quality: str = DEFAULT_QUALITY, art=None, visuals: Optional[Mapping[str, str]] = None) -> VideoResult:
+               quality: str = DEFAULT_QUALITY, art=None, visuals: Optional[Mapping[str, str]] = None,
+               on_stage: Optional[Callable[[str, str, str], None]] = None) -> VideoResult:
     out_path = Path(out_path)
     if work_dir is None:                                  # dry run: scratch space only, nothing left behind
         work_dir = out_path.parent / (out_path.stem + "_work") if render else Path(tempfile.mkdtemp(prefix="sfs_"))
@@ -176,11 +177,12 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
         from modules.voice_library.language import detect_language
         from modules.voice_library.library import builtin_library
         voice = builtin_library().default(detect_language(" ".join(c.text for c in pool)) or "en")
+    emit = on_stage or (lambda *_: None)
     for _ in range(max_adjustments + 2):
         recorder.tempo = state["tempo"]
         try:
             res = run_pipeline(request, pool, tts=recorder, pad_s=state["pad"], voice=voice, voice_speed=speed,
-                               unavailable_modes=UNAVAILABLE_MODES)
+                               unavailable_modes=UNAVAILABLE_MODES, on_stage=on_stage)
         except (VoiceError, RuntimeError) as exc:                   # engine failure, FFmpeg missing, offline ...
             return _fail(PipelineResult(request=request), log, f"voice engine failed: {exc}")
         if res.ok or res.status != PipelineStatus.TIMELINE_CHECKS_FAILED:
@@ -193,10 +195,12 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
                 log.append(f"N0: measured speaking rate {measured:.0f} wpm vs planned {res.planning_wpm:.0f} wpm "
                            f"-> script length re-planned")
                 voice = replace(voice, measured_wpm=measured / speed)
+                emit("replan", "info", log[-1])
                 continue
         if adjustments >= max_adjustments or not _adjust(res, state, pool, log):
             break
         adjustments += 1
+        emit("replan", "info", log[-1] if log else "Adjusting the narration length and measuring again")
         if state.get("plan_wpm"):                                   # N1: plan for the corrected rate
             voice = replace(voice, measured_wpm=state["plan_wpm"] / speed)
     if not res.ok:
@@ -230,13 +234,16 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
     render_info: dict = {}
     measured_s: Optional[float] = None
     if render:
+        emit("render", "start", "")
         try:
             render_info = render_video(res.timeline, composed, recorder, out_path, style, fps, burn_subtitles,
                                        soft_subtitles, progress, quality)
             measured_s = probe_duration(out_path)
+            emit("render", "done", f"{render_info.get('frames')} frames, {render_info.get('size', [0, 0])[0]}×{render_info.get('size', [0, 0])[1]} MP4")
         except (RenderError, VoiceError, RuntimeError) as exc:
             return _fail(res, log, f"render failed: {exc}")
 
+    emit("verify", "start", "")
     report = build_report(res, composed, problems, engine, state, log, style, fps, measured_s, render_info,
                           out_path if render else None)
     if art is not None and fmt == OutputFormat.INFOGRAPHIC:
@@ -263,6 +270,7 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
         report["resolution"] = render_info.get("size", report["resolution"])    # the size of the file, not of the drawing
         out_path.with_suffix(".report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2),
                                                         encoding="utf-8")
+    emit("verify", "done", (f"Measured length {measured_s:.1f} s against the {res.timeline.t_target:.0f} s target" if measured_s else "Checks evaluated"))
     return VideoResult(True, out_path if render else None, res, report, log)
 
 

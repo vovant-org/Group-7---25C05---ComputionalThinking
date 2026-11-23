@@ -25,7 +25,7 @@ def prepare_ai(request: str, reference: str, claims: Optional[list], *, read_kin
                folder: Optional[Path] = None, allow_online: bool = False, n_scenes: int = 14,
                cache_dir: Optional[Path] = None) -> AIPlan:
     """Raises AIError when the user did not confirm online use or a provider cannot start."""
-    online = read_kind in ("pollinations", "gemini") or image_kind == "pollinations"
+    online = read_kind in ("auto", "pollinations", "gemini") or image_kind in ("pollinations", "cloudflare")
     if online and not allow_online:
         raise AIError("this AI option sends your text to an online service: confirm it first (--allow-online)")
     plan = AIPlan()

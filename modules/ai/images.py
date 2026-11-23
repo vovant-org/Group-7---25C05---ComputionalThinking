@@ -10,6 +10,7 @@ Prompts always ask for NO text in the picture: words and numbers on screen are d
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import io
 import json
@@ -26,7 +27,7 @@ from modules.ai.net import AIError, http_request
 STYLE = ("clean flat vector infographic illustration, soft pastel colors on a plain light background, "
          "simple bold shapes, one clear subject, no clutter")
 NEGATIVE = "no text, no letters, no numbers, no captions, no watermark, no logo"
-IMAGE_CHOICES = ("off", "pollinations", "folder")
+IMAGE_CHOICES = ("off", "pollinations", "cloudflare", "folder")
 
 
 def build_prompt(visual: str) -> str:
@@ -81,6 +82,55 @@ class PollinationsImage:
         raise last or AIError("image request failed")
 
 
+class CloudflareImage:
+    """Cloudflare Workers AI (FLUX.1 schnell by default). Free plan: 10,000 neurons per day, no card.
+    Needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN (token with Workers AI permission).
+    CLOUDFLARE_IMAGE_MODEL overrides the model (for example another FLUX model of the Workers AI catalogue)."""
+    name = "cloudflare-image"
+    online = True
+
+    def __init__(self, account_id: Optional[str] = None, token: Optional[str] = None, model: Optional[str] = None,
+                 steps: int = 4, retries: int = 2, timeout: float = 120.0,
+                 sleep: Callable[[float], None] = time.sleep):
+        self.account = (account_id or os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")).strip()
+        self.token = (token or os.environ.get("CLOUDFLARE_API_TOKEN", "")).strip()
+        self.model = model or os.environ.get("CLOUDFLARE_IMAGE_MODEL", "@cf/black-forest-labs/flux-1-schnell")
+        self.steps, self.retries, self.timeout, self._sleep = steps, retries, timeout, sleep
+        if not self.account or not self.token:
+            raise AIError("set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN (free account at dash.cloudflare.com)")
+
+    def fetch(self, key: str, prompt: str, size: tuple[int, int], seed: int) -> Optional[bytes]:
+        url = f"https://api.cloudflare.com/client/v4/accounts/{self.account}/ai/run/{self.model}"
+        body = json.dumps({"prompt": prompt, "steps": self.steps}).encode("utf-8")      # flux-1-schnell rejects "seed" (HTTP 400)
+        headers = {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
+        last: Optional[AIError] = None
+        softened = False
+        for attempt in range(self.retries + 1):
+            try:
+                raw = http_request(url, data=body, headers=headers, timeout=self.timeout)
+                if raw[:4] in (b"\x89PNG", b"\xff\xd8\xff\xe0", b"\xff\xd8\xff\xe1", b"\xff\xd8\xff\xdb"):
+                    return raw                                           # some models answer with the picture itself
+                data = json.loads(raw)
+                if not data.get("success", True):
+                    raise AIError(f"Cloudflare: {str(data.get('errors'))[:200]}")
+                img = base64.b64decode(data["result"]["image"])
+                Image.open(io.BytesIO(img)).verify()
+                return img
+            except AIError as exc:
+                last = exc
+                if exc.content_filtered and not softened:         # false positive of the safety filter: say it more safely, once
+                    softened = True
+                    safe = "Safe for all ages, family-friendly, no people, no bodies, symbolic objects only. " + prompt
+                    body = json.dumps({"prompt": safe, "steps": self.steps}).encode("utf-8")
+                    continue
+                if not exc.retryable:
+                    break
+                self._sleep(exc.retry_after or 5.0 * (attempt + 1))
+            except (ValueError, KeyError, TypeError) as exc:
+                raise AIError(f"unexpected answer from Cloudflare: {exc}") from exc
+        raise last or AIError("image request failed")
+
+
 class FolderImages:
     name = "folder"
     online = False
@@ -102,6 +152,8 @@ def make_image_provider(kind: str, folder: Optional[Path] = None) -> Optional[Im
         return None
     if kind == "pollinations":
         return PollinationsImage()
+    if kind == "cloudflare":
+        return CloudflareImage()
     if kind == "folder":
         if folder is None:
             raise AIError("the folder provider needs a folder")
@@ -154,7 +206,8 @@ class ArtService:
                 return None
             data = self.provider.fetch(key, prompt, self.size, seed)
         except AIError as exc:
-            self._fails += 1
+            if not exc.content_filtered:                 # a refused prompt is not a broken provider: do not trip the breaker
+                self._fails += 1
             self.errors.append(f"{key}: {exc}")
             return None
         if data is None:

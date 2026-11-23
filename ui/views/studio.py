@@ -5,6 +5,7 @@ backend cannot edit a scene, so none is drawn.
 """
 from __future__ import annotations
 
+import html as _html
 import json
 
 import pandas as pd
@@ -77,6 +78,13 @@ def render() -> None:
                                       "deleted). The scenes and timeline below come from the saved report."))
         if silent:
             html(C.alert("warn", "This video has no sound", "It was made with the silent engine. Create it again with a system or Edge voice to hear the narration."))
+        ai_img, ai_notes = rep.get("ai_images"), rep.get("ai_notes") or []
+        if ai_img and ai_img.get("scenes_with_image", 0) < ai_img.get("scenes_total", 0):
+            errs = "; ".join(e[:160] for e in ai_img.get("errors", [])[:3]) or "no picture was returned"
+            html(C.alert("warn", f"AI pictures: {ai_img.get('scenes_with_image', 0)} of {ai_img.get('scenes_total', 0)} scenes ({ai_img.get('provider', '')})",
+                         _html.escape(errs) + " The other scenes are drawn by code."))
+        if ai_notes:
+            html(C.alert("info", "AI reader", _html.escape(" ".join(ai_notes)[:600])))
 
         # ---- timeline
         html(C.section("Timeline"))

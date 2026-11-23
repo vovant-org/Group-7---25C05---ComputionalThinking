@@ -298,3 +298,81 @@ def test_pollinations_key_removes_the_wait_and_is_sent(monkeypatch):
     prov = I.PollinationsImage(api_key="sk_test", sleep=slept.append, clock=lambda: 0.0)
     prov.fetch("a", "x", (64, 64), 1); prov.fetch("b", "y", (64, 64), 1)
     assert slept == [] and sent[0] == {"Authorization": "Bearer sk_test"}
+
+
+def test_cloudflare_provider_sends_token_and_decodes_the_base64_picture(monkeypatch):
+    import base64
+    seen = {}
+
+    def fake(url, data=None, headers=None, timeout=0):
+        seen.update(url=url, body=json.loads(data), headers=headers)
+        return json.dumps({"success": True, "result": {"image": base64.b64encode(png()).decode()}}).encode()
+    monkeypatch.setattr(I, "http_request", fake)
+    prov = I.CloudflareImage(account_id="acc123", token="tok", sleep=lambda s: None)
+    assert Image.open(io.BytesIO(prov.fetch("AI01", "a moon", (64, 64), 5))).size == (64, 64)
+    assert seen["url"].endswith("/accounts/acc123/ai/run/@cf/black-forest-labs/flux-1-schnell")
+    assert seen["headers"]["Authorization"] == "Bearer tok" and seen["body"]["prompt"] == "a moon"
+    assert set(seen["body"]) == {"prompt", "steps"}                  # Cloudflare answered 400 to an extra "seed" field
+
+
+def test_cloudflare_needs_credentials_and_needs_consent(monkeypatch):
+    monkeypatch.delenv("CLOUDFLARE_ACCOUNT_ID", raising=False)
+    monkeypatch.delenv("CLOUDFLARE_API_TOKEN", raising=False)
+    with pytest.raises(AIError, match="CLOUDFLARE_ACCOUNT_ID"):
+        I.make_image_provider("cloudflare")
+    with pytest.raises(AIError, match="online"):
+        prepare_ai("sleep", REFERENCE, [], image_kind="cloudflare", allow_online=False)
+
+
+def test_reader_retries_a_busy_provider_before_giving_up(monkeypatch):
+    waits = []
+    monkeypatch.setattr(R, "SLEEP", waits.append)
+
+    class Busy(FakeLLM):
+        def complete(self, system, user):
+            self.calls.append(1)
+            if len(self.calls) <= 2:
+                raise AIError("HTTP 503 high demand", True)
+            return scenes_json(SENTENCES)
+    llm = Busy()
+    res = R.read_input("sleep video", REFERENCE, llm, n_scenes=8)
+    assert res.used_ai and len(llm.calls) == 3 and waits == [4.0, 10.0]
+    never = FakeLLM(exc=AIError("HTTP 503", True))
+    assert not R.read_input("sleep", REFERENCE, never).used_ai and len(never.calls) == 4     # 1 try + 3 retries, then the baseline
+
+
+def test_content_filter_gets_one_softer_prompt_and_does_not_trip_the_breaker(monkeypatch):
+    import base64
+    sent = []
+
+    def fake(url, data=None, headers=None, timeout=0):
+        prompt = json.loads(data)["prompt"]
+        sent.append(prompt)
+        if "family-friendly" not in prompt:
+            raise AIError("HTTP 400 NSFW", False, 0, content_filtered=True)
+        return json.dumps({"success": True, "result": {"image": base64.b64encode(png()).decode()}}).encode()
+    monkeypatch.setattr(I, "http_request", fake)
+    prov = I.CloudflareImage(account_id="a", token="t", sleep=lambda s: None)
+    assert prov.fetch("k", "a bed at night", (64, 64), 1) and len(sent) == 2
+
+    class AlwaysFiltered:
+        name, online = "filtered", True
+
+        def fetch(self, *a):
+            raise AIError("NSFW", False, 0, content_filtered=True)
+    art = I.ArtService(AlwaysFiltered(), "unused")
+    assert [art.get(f"AI0{i}", "x") for i in range(4)] == [None] * 4
+    assert all("skipped" not in e for e in art.errors)                # every scene was still tried
+
+
+def test_auto_reader_falls_back_from_a_busy_gemini_to_pollinations(monkeypatch):
+    from modules.ai import llm as L
+    busy, ok = FakeLLM(exc=AIError("HTTP 503", True)), FakeLLM(scenes_json(SENTENCES))
+    ok.name = "pollinations-text"
+    chain = L.FallbackLLM([busy, ok])
+    res = R.read_input("sleep video", REFERENCE, chain, n_scenes=8)
+    assert res.used_ai and len(busy.calls) == 1 and len(ok.calls) == 1 and res.reader == "auto(pollinations-text)"
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    assert [p.name for p in L.make_llm("auto").providers] == ["pollinations-text"]       # no key: Pollinations only
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    assert [p.name for p in L.make_llm("auto").providers] == ["gemini-text", "pollinations-text"]

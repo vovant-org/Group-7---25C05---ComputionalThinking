@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -38,7 +39,9 @@ Rules:
 - "importance": number from 0 to 1.
 - "pattern": one of cause_effect, comparison, step_by_step, trend, analogy.
 - "visual": an ENGLISH description (max 30 words) of ONE simple picture that shows exactly what the claim says:
-  the main objects, what they do, and the setting. No text, letters, numbers, logos or real people's names."""
+  the main objects, what they do, and the setting. No text, letters, numbers, logos or real people's names.
+  Keep it family-friendly and symbolic: prefer objects, icons and simple scenes (moon, brain, clock, plant, cup) and
+  avoid people lying down, bodies or skin, because image services reject such prompts."""
 
 _RULE_REF = ('- The claim MUST be a sentence of the reference text, copied or only trimmed. Never add a fact, a number '
              'or a word that is not in the reference text.')
@@ -71,7 +74,7 @@ def grounding(claim: str, reference: str) -> float:
 def local_visual(text: str) -> str:
     """Offline picture description: the claim's content words. Used when no LLM wrote a better one."""
     words = [w for w in _tokens(text) if w not in _STOP and not w.isdigit() and len(w) > 2][:8]
-    return "a simple scene showing " + ", ".join(words) if words else "a simple abstract scene"
+    return "a simple family-friendly symbolic icon scene showing " + ", ".join(words) if words else "a simple abstract scene"
 
 
 def _extract_json(raw: str) -> dict:
@@ -86,6 +89,21 @@ def _extract_json(raw: str) -> dict:
         return json.loads(raw[a:b + 1])
 
 
+SLEEP = time.sleep
+RETRY_WAITS = (4.0, 10.0, 20.0)          # a busy provider ("503 high demand") is usually back within seconds
+
+
+def _complete(llm: LLM, system: str, user: str) -> str:
+    for wait in (*RETRY_WAITS, None):
+        try:
+            return llm.complete(system, user)
+        except AIError as exc:
+            if wait is None or not exc.retryable:
+                raise
+            SLEEP(exc.retry_after or wait)
+    raise AIError("unreachable")
+
+
 _PATTERNS = {"cause_effect", "comparison", "step_by_step", "trend", "analogy"}
 
 
@@ -94,7 +112,7 @@ def _from_llm(llm: LLM, topic: str, reference: str, n_scenes: int) -> ReadResult
                            claim_rule=_RULE_REF if reference.strip() else _RULE_TOPIC)
     user = f"TOPIC / REQUEST:\n{topic.strip()}\n\n" + (f"REFERENCE TEXT:\n{reference.strip()}\n" if reference.strip()
                                                        else "REFERENCE TEXT: (none)\n")
-    data = _extract_json(llm.complete(system, user))
+    data = _extract_json(_complete(llm, system, user))
     scenes = data.get("scenes") if isinstance(data, dict) else None
     if not isinstance(scenes, list):
         raise ValueError("no 'scenes' list in the answer")

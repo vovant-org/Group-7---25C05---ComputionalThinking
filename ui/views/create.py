@@ -130,7 +130,7 @@ def _validate(ctx: dict, *, final: bool) -> list[dict]:
               voice_language=ss["language"], upload_error=ss["upload_error"], detected_language=ctx["detected"],
               ai_reads=ss["ai_read"] != "off")
     if final:
-        needs = ss["ai_read"] != "off" or ss["ai_image"] == "pollinations"
+        needs = ss["ai_read"] != "off" or ss["ai_image"] in ("pollinations", "cloudflare")
         return validate_inputs(ffmpeg_ok=runner.ffmpeg_ok(), online_ok=bool(ss["allow_online"]), engine_kind=ss["engine"],
                                ai_online_needed=needs, ai_online_ok=bool(ss["ai_online"]), **kw)
     return validate_inputs(ffmpeg_ok=True, online_ok=True, engine_kind="system", **kw)
@@ -261,18 +261,18 @@ def _step_budget(ctx: dict) -> None:
             st.checkbox("I understand the narration text is sent to an online service", key=S.seed("allow_online"), on_change=S.sync,
                         args=("allow_online",), help="Do not send private or sensitive text (report R7 / AI tool policy).")
         st.markdown("**AI (free)**")
-        st.radio("AI reads my input", ["off", "pollinations", "gemini"], key=S.seed("ai_read"), on_change=S.sync, args=("ai_read",), horizontal=True,
-                 format_func={"off": "Off", "pollinations": "Pollinations (no key)", "gemini": "Gemini (free key)"}.get,
+        st.radio("AI reads my input", ["off", "auto", "pollinations", "gemini"], key=S.seed("ai_read"), on_change=S.sync, args=("ai_read",), horizontal=True,
+                 format_func={"off": "Off", "auto": "Auto (Gemini, then Pollinations)", "pollinations": "Pollinations (no key)", "gemini": "Gemini (free key)"}.get,
                  help="An AI reads your topic and material, picks the claims and describes one picture per scene. With reference text, "
                       "every claim must come from your text (the app checks this). Gemini needs the GEMINI_API_KEY environment variable.")
         if ss["fmt"] == "INFOGRAPHIC":
-            st.radio("AI picture of each claim", ["off", "pollinations", "folder"], key=S.seed("ai_image"), on_change=S.sync, args=("ai_image",),
-                     horizontal=True, format_func={"off": "Off", "pollinations": "Pollinations (free, slow)", "folder": "My own pictures"}.get,
+            st.radio("AI picture of each claim", ["off", "pollinations", "cloudflare", "folder"], key=S.seed("ai_image"), on_change=S.sync, args=("ai_image",),
+                     horizontal=True, format_func={"off": "Off", "pollinations": "Pollinations (free, slow)", "cloudflare": "Cloudflare (free key)", "folder": "My own pictures"}.get,
                      help="Pollinations: about one picture per 15 s. My own pictures: make them in Google Flow / ImageFX and save them as "
                           "<claim id>.png in a folder (the prompt kit comes from the command line: --export-kit). Text on screen is still drawn by code.")
             if ss["ai_image"] == "folder":
                 st.text_input("Folder with the pictures", key=S.seed("ai_folder"), on_change=S.sync, args=("ai_folder",))
-        if ss["ai_read"] != "off" or (ss["fmt"] == "INFOGRAPHIC" and ss["ai_image"] == "pollinations"):
+        if ss["ai_read"] != "off" or (ss["fmt"] == "INFOGRAPHIC" and ss["ai_image"] in ("pollinations", "cloudflare")):
             st.checkbox("I understand my text is sent to an online AI service", key=S.seed("ai_online"), on_change=S.sync, args=("ai_online",),
                         help="Do not send private or sensitive text.")
         if ss["fmt"] == "ANIMATION":

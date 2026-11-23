@@ -1,116 +1,64 @@
 1
-00:00:00,000 --> 00:00:01,326
-Sleep is a natural
+00:00:00,000 --> 00:00:03,776
+Sleep is an active process during which the brain sorts
 
 2
-00:00:01,326 --> 00:00:06,482
-Cyclic process that restores the body and mind after a day of activity
+00:00:03,776 --> 00:00:07,209
+memories and clears waste built up during the day.
 
 3
-00:00:06,482 --> 00:00:08,932
-During sleep, the brain consolidates memories
+00:00:07,259 --> 00:00:11,032
+The night is split into repeating cycles of light sleep
 
 4
-00:00:08,932 --> 00:00:11,873
-Strengthening learning and creativity for the next day
+00:00:11,032 --> 00:00:15,559
+Deep sleep and dream sleep, each doing different work for the body
 
 5
-00:00:11,873 --> 00:00:14,485
-Deep sleep stages help repair muscles, tissues,
+00:00:15,609 --> 00:00:19,206
+Going without enough sleep makes it harder to concentrate
 
 6
-00:00:14,485 --> 00:00:17,264
-and cells, promoting physical recovery and growth.
+00:00:19,206 --> 00:00:23,182
+Remember new facts and react quickly to what happens around you
 
 7
-00:00:17,264 --> 00:00:19,529
-Light sleep allows the body to transition
+00:00:23,232 --> 00:00:26,688
+Over months and years, regular short sleep is linked
 
 8
-00:00:19,529 --> 00:00:22,291
-between wakefulness and deeper restorative phases.
+00:00:26,688 --> 00:00:30,077
+With higher risks of heart problems and weight gain
 
 9
-00:00:22,291 --> 00:00:25,378
-The circadian rhythm, driven by light exposure
+00:00:30,127 --> 00:00:34,102
+Keeping the same bedtime and wake-up time, even on weekends
 
 10
-00:00:25,378 --> 00:00:29,136
-Signals when the body should feel alert or ready to rest
+00:00:34,102 --> 00:00:37,336
+Helps the body clock settle into a steady rhythm
 
 11
-00:00:29,136 --> 00:00:33,436
-Consistent sleep schedules improve mood, reduce stress, and enhance emotional resilience.
+00:00:37,386 --> 00:00:41,024
+Bright screens late in the evening can delay sleepiness
 
 12
-00:00:33,436 --> 00:00:36,442
-Poor sleep quality can weaken the immune system
+00:00:41,024 --> 00:00:44,595
+Because light tells the brain that it is still daytime
 
 13
-00:00:36,442 --> 00:00:39,191
-Making the body more susceptible to illness
+00:00:44,645 --> 00:00:48,866
+To build a better routine, first fix your wake-up time, then
 
 14
-00:00:39,191 --> 00:00:41,180
-Sleep deprivation increases the risk
+00:00:48,866 --> 00:00:52,945
+dim the lights early, and finally keep screens out of bed.
 
 15
-00:00:41,180 --> 00:00:44,218
-Of chronic conditions such as hypertension and diabetes
+00:00:52,995 --> 00:00:58,054
+Sleep problems that last for weeks, such as loud snoring with daytime exhaustion
 
 16
-00:00:44,218 --> 00:00:47,454
-The brain’s glymphatic system clears waste products during sleep
-
-17
-00:00:47,454 --> 00:00:50,336
-Reducing the buildup linked to neurodegenerative diseases
-
-18
-00:00:50,336 --> 00:00:54,636
-A comfortable sleep environment—cool, dark, and quiet—supports deeper, more restorative rest.
-
-19
-00:00:54,636 --> 00:00:57,933
-Limiting screen time before bed reduces blue light exposure
-
-20
-00:00:57,933 --> 00:01:00,391
-Helping the body produce melatonin naturally
-
-21
-00:01:00,391 --> 00:01:03,685
-Regular physical activity during the day promotes faster
-
-22
-00:01:03,685 --> 00:01:06,509
-sleep onset and improves sleep quality at night.
-
-23
-00:01:06,509 --> 00:01:09,077
-Mindful breathing and relaxation techniques can
-
-24
-00:01:09,077 --> 00:01:11,536
-Ease the transition from wakefulness to sleep
-
-25
-00:01:11,536 --> 00:01:16,200
-Adequate sleep supports healthy weight management by regulating hunger hormones and metabolism.
-
-26
-00:01:16,200 --> 00:01:19,170
-Sleep plays a crucial role in emotional regulation
-
-27
-00:01:19,170 --> 00:01:22,318
-Helping the brain process feelings and reduce anxiety
-
-28
-00:01:22,318 --> 00:01:24,930
-Prioritizing sleep is as essential as nutrition
-
-29
-00:01:24,930 --> 00:01:27,709
-and exercise for overall well‑being and longevity.
+00:00:58,054 --> 00:01:00,205
+Are worth discussing with a doctor
 

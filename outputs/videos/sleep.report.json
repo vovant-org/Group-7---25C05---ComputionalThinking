@@ -1,89 +1,59 @@
 {
   "video": "D:\\Project07\\outputs\\videos\\sleep.mp4",
-  "request": "Make a 90-second infographic video about sleep",
+  "request": "Make a 60-second infographic video about sleep",
   "format": "INFOGRAPHIC",
-  "t_target": 90.0,
-  "total_s": 87.71,
-  "deviation": 0.0254,
+  "t_target": 60.0,
+  "total_s": 60.25,
+  "deviation": 0.0042,
   "fps": 24,
   "resolution": [
     1280,
     720
   ],
-  "scenes": 16,
-  "frames": 2105,
-  "subtitle_cues": 29,
+  "scenes": 8,
+  "frames": 1446,
+  "subtitle_cues": 16,
   "voice_engine": "silent-165-0.3",
   "voice_is_silent": true,
   "voice_speed_factor": 1.0,
-  "pause_per_scene_s": 0.0,
+  "pause_per_scene_s": 0.05,
   "claims": [
     {
-      "claim_id": "AI01",
-      "text": "Sleep is a natural, cyclic process that restores the body and mind after a day of activity."
+      "claim_id": "SLE01",
+      "text": "Sleep is an active process during which the brain sorts memories and clears waste built up during the day."
     },
     {
-      "claim_id": "AI02",
-      "text": "During sleep, the brain consolidates memories, strengthening learning and creativity for the next day."
+      "claim_id": "SLE02",
+      "text": "The night is split into repeating cycles of light sleep, deep sleep and dream sleep, each doing different work for the body."
     },
     {
-      "claim_id": "AI03",
-      "text": "Deep sleep stages help repair muscles, tissues, and cells, promoting physical recovery and growth."
+      "claim_id": "SLE03",
+      "text": "Going without enough sleep makes it harder to concentrate, remember new facts and react quickly to what happens around you."
     },
     {
-      "claim_id": "AI04",
-      "text": "Light sleep allows the body to transition between wakefulness and deeper restorative phases."
+      "claim_id": "SLE04",
+      "text": "Over months and years, regular short sleep is linked with higher risks of heart problems and weight gain."
     },
     {
-      "claim_id": "AI05",
-      "text": "The circadian rhythm, driven by light exposure, signals when the body should feel alert or ready to rest."
+      "claim_id": "SLE05",
+      "text": "Keeping the same bedtime and wake-up time, even on weekends, helps the body clock settle into a steady rhythm."
     },
     {
-      "claim_id": "AI06",
-      "text": "Consistent sleep schedules improve mood, reduce stress, and enhance emotional resilience."
+      "claim_id": "SLE06",
+      "text": "Bright screens late in the evening can delay sleepiness because light tells the brain that it is still daytime."
     },
     {
-      "claim_id": "AI07",
-      "text": "Poor sleep quality can weaken the immune system, making the body more susceptible to illness."
+      "claim_id": "SLE11",
+      "text": "To build a better routine, first fix your wake-up time, then dim the lights early, and finally keep screens out of bed."
     },
     {
-      "claim_id": "AI08",
-      "text": "Sleep deprivation increases the risk of chronic conditions such as hypertension and diabetes."
-    },
-    {
-      "claim_id": "AI09",
-      "text": "The brain’s glymphatic system clears waste products during sleep, reducing the buildup linked to neurodegenerative diseases."
-    },
-    {
-      "claim_id": "AI10",
-      "text": "A comfortable sleep environment—cool, dark, and quiet—supports deeper, more restorative rest."
-    },
-    {
-      "claim_id": "AI11",
-      "text": "Limiting screen time before bed reduces blue light exposure, helping the body produce melatonin naturally."
-    },
-    {
-      "claim_id": "AI12",
-      "text": "Regular physical activity during the day promotes faster sleep onset and improves sleep quality at night."
-    },
-    {
-      "claim_id": "AI13",
-      "text": "Mindful breathing and relaxation techniques can ease the transition from wakefulness to sleep."
-    },
-    {
-      "claim_id": "AI14",
-      "text": "Adequate sleep supports healthy weight management by regulating hunger hormones and metabolism."
-    },
-    {
-      "claim_id": "AI15",
-      "text": "Sleep plays a crucial role in emotional regulation, helping the brain process feelings and reduce anxiety."
-    },
-    {
-      "claim_id": "AI16",
-      "text": "Prioritizing sleep is as essential as nutrition and exercise for overall well‑being and longevity."
+      "claim_id": "SLE12",
+      "text": "Sleep problems that last for weeks, such as loud snoring with daytime exhaustion, are worth discussing with a doctor."
     }
   ],
-  "adjustments": [],
+  "adjustments": [
+    "N4 pause 0.00 -> 0.05 s per scene (now 59.9 s, expected 60.3 s for a 60 s target)"
+  ],
   "criteria": {
     "S11": {
       "pass": true,
@@ -91,237 +61,122 @@
     },
     "S12": {
       "pass": true,
-      "detail": "87.71 s (measured on the MP4)"
+      "detail": "60.25 s (measured on the MP4)"
     },
     "S13": {
       "pass": true,
-      "detail": "2.5% off the 90 s target"
+      "detail": "0.4% off the 60 s target"
     },
     "S15": {
       "pass": true,
-      "detail": "every label comes from its claim; smallest font 32px (limit 26px, assumed)"
+      "detail": "every label comes from its claim; smallest font 40px (limit 26px, assumed)"
     }
   },
   "notes": [
     "The audio track is SILENT (SilentEngine): durations follow a words-per-minute rule.",
-    "AI pictures: 0 of 16 scenes (pollinations-image); the other scenes are drawn by code. All text is still drawn by code from the claims."
+    "AI pictures: 8 of 8 scenes (cloudflare-image); the other scenes are drawn by code. All text is still drawn by code from the claims."
   ],
   "timeline": [
     {
       "scene": 0,
       "start_s": 0.0,
-      "duration_s": 6.482,
+      "duration_s": 7.259,
       "mode": "REVEAL",
-      "layout": "steps",
+      "layout": "ai_visual",
       "labels": [
-        "Sleep is a natural",
-        "Cyclic process that restores the body and mind after a day of activity"
+        "Sleep is an active process during which the brain sorts memories and clears waste built up during the day"
       ],
-      "narration": "Sleep is a natural, cyclic process that restores the body and mind after a day of activity."
+      "narration": "Sleep is an active process during which the brain sorts memories and clears waste built up during the day."
     },
     {
       "scene": 1,
-      "start_s": 6.482,
-      "duration_s": 5.391,
+      "start_s": 7.259,
+      "duration_s": 8.35,
       "mode": "REVEAL",
-      "layout": "cause_chain",
+      "layout": "ai_visual",
       "labels": [
-        "During sleep, the brain consolidates memories",
-        "Strengthening learning and creativity for the next day"
+        "The night is split into repeating cycles of light sleep, deep sleep and dream sleep, each doing different work for the body"
       ],
-      "narration": "During sleep, the brain consolidates memories, strengthening learning and creativity for the next day."
+      "narration": "The night is split into repeating cycles of light sleep, deep sleep and dream sleep, each doing different work for the body."
     },
     {
       "scene": 2,
-      "start_s": 11.873,
-      "duration_s": 5.391,
+      "start_s": 15.609,
+      "duration_s": 7.623,
       "mode": "REVEAL",
-      "layout": "steps",
+      "layout": "ai_visual",
       "labels": [
-        "Deep sleep stages help repair muscles, tissues",
-        "Cells, promoting physical recovery and growth"
+        "Going without enough sleep makes it harder to concentrate, remember new facts and react quickly to what happens around you"
       ],
-      "narration": "Deep sleep stages help repair muscles, tissues, and cells, promoting physical recovery and growth."
+      "narration": "Going without enough sleep makes it harder to concentrate, remember new facts and react quickly to what happens around you."
     },
     {
       "scene": 3,
-      "start_s": 17.264,
-      "duration_s": 5.027,
+      "start_s": 23.232,
+      "duration_s": 6.895,
       "mode": "REVEAL",
-      "layout": "steps",
+      "layout": "ai_visual",
       "labels": [
-        "Light sleep allows the body to transition between wakefulness and deeper restorative phases"
+        "Over months and years, regular short sleep is linked with higher risks of heart problems and weight gain"
       ],
-      "narration": "Light sleep allows the body to transition between wakefulness and deeper restorative phases."
+      "narration": "Over months and years, regular short sleep is linked with higher risks of heart problems and weight gain."
     },
     {
       "scene": 4,
-      "start_s": 22.291,
-      "duration_s": 6.845,
+      "start_s": 30.127,
+      "duration_s": 7.259,
       "mode": "REVEAL",
-      "layout": "cause_chain",
+      "layout": "ai_visual",
       "labels": [
-        "The circadian rhythm, driven by light exposure",
-        "Signals when the body should feel alert or ready to rest"
+        "Keeping the same bedtime and wake-up time, even on weekends, helps the body clock settle into a steady rhythm"
       ],
-      "narration": "The circadian rhythm, driven by light exposure, signals when the body should feel alert or ready to rest."
+      "narration": "Keeping the same bedtime and wake-up time, even on weekends, helps the body clock settle into a steady rhythm."
     },
     {
       "scene": 5,
-      "start_s": 29.136,
-      "duration_s": 4.3,
+      "start_s": 37.386,
+      "duration_s": 7.259,
       "mode": "REVEAL",
-      "layout": "cause_chain",
+      "layout": "ai_visual",
       "labels": [
-        "Consistent sleep schedules improve mood",
-        "Reduce stress, and enhance emotional resilience"
+        "Bright screens late in the evening can delay sleepiness because light tells the brain that it is still daytime"
       ],
-      "narration": "Consistent sleep schedules improve mood, reduce stress, and enhance emotional resilience."
+      "narration": "Bright screens late in the evening can delay sleepiness because light tells the brain that it is still daytime."
     },
     {
       "scene": 6,
-      "start_s": 33.436,
-      "duration_s": 5.755,
+      "start_s": 44.645,
+      "duration_s": 8.35,
       "mode": "REVEAL",
-      "layout": "cause_chain",
+      "layout": "ai_visual",
       "labels": [
-        "Poor sleep quality can weaken the immune system",
-        "Making the body more susceptible to illness"
+        "To build a better routine, first fix your wake-up time, then dim the lights early, and finally keep screens out of bed"
       ],
-      "narration": "Poor sleep quality can weaken the immune system, making the body more susceptible to illness."
+      "narration": "To build a better routine, first fix your wake-up time, then dim the lights early, and finally keep screens out of bed."
     },
     {
       "scene": 7,
-      "start_s": 39.191,
-      "duration_s": 5.027,
+      "start_s": 52.995,
+      "duration_s": 7.259,
       "mode": "REVEAL",
-      "layout": "cause_chain",
+      "layout": "ai_visual",
       "labels": [
-        "Sleep deprivation increases the risk",
-        "Of chronic conditions such as hypertension and diabetes"
+        "Sleep problems that last for weeks, such as loud snoring with daytime exhaustion, are worth discussing with a doctor"
       ],
-      "narration": "Sleep deprivation increases the risk of chronic conditions such as hypertension and diabetes."
-    },
-    {
-      "scene": 8,
-      "start_s": 44.218,
-      "duration_s": 6.118,
-      "mode": "REVEAL",
-      "layout": "cause_chain",
-      "labels": [
-        "The brain’s glymphatic system clears waste products during sleep",
-        "Reducing the buildup linked to neurodegenerative diseases"
-      ],
-      "narration": "The brain’s glymphatic system clears waste products during sleep, reducing the buildup linked to neurodegenerative diseases."
-    },
-    {
-      "scene": 9,
-      "start_s": 50.336,
-      "duration_s": 4.3,
-      "mode": "REVEAL",
-      "layout": "compare_2col",
-      "labels": [
-        "A comfortable sleep environment—cool, dark",
-        "Quiet—supports deeper, more restorative rest"
-      ],
-      "narration": "A comfortable sleep environment—cool, dark, and quiet—supports deeper, more restorative rest."
-    },
-    {
-      "scene": 10,
-      "start_s": 54.636,
-      "duration_s": 5.755,
-      "mode": "REVEAL",
-      "layout": "steps",
-      "labels": [
-        "Limiting screen time before bed reduces blue light exposure",
-        "Helping the body produce melatonin naturally"
-      ],
-      "narration": "Limiting screen time before bed reduces blue light exposure, helping the body produce melatonin naturally."
-    },
-    {
-      "scene": 11,
-      "start_s": 60.391,
-      "duration_s": 6.118,
-      "mode": "REVEAL",
-      "layout": "cause_chain",
-      "labels": [
-        "Regular physical activity during the day promotes faster",
-        "Sleep onset and improves sleep quality at night"
-      ],
-      "narration": "Regular physical activity during the day promotes faster sleep onset and improves sleep quality at night."
-    },
-    {
-      "scene": 12,
-      "start_s": 66.509,
-      "duration_s": 5.027,
-      "mode": "REVEAL",
-      "layout": "steps",
-      "labels": [
-        "Mindful breathing and relaxation techniques can ease the transition from wakefulness to sleep"
-      ],
-      "narration": "Mindful breathing and relaxation techniques can ease the transition from wakefulness to sleep."
-    },
-    {
-      "scene": 13,
-      "start_s": 71.536,
-      "duration_s": 4.664,
-      "mode": "REVEAL",
-      "layout": "cause_chain",
-      "labels": [
-        "Adequate sleep supports healthy weight management",
-        "By regulating hunger hormones and metabolism"
-      ],
-      "narration": "Adequate sleep supports healthy weight management by regulating hunger hormones and metabolism."
-    },
-    {
-      "scene": 14,
-      "start_s": 76.2,
-      "duration_s": 6.118,
-      "mode": "REVEAL",
-      "layout": "cause_chain",
-      "labels": [
-        "Sleep plays a crucial role in emotional regulation",
-        "Helping the brain process feelings and reduce anxiety"
-      ],
-      "narration": "Sleep plays a crucial role in emotional regulation, helping the brain process feelings and reduce anxiety."
-    },
-    {
-      "scene": 15,
-      "start_s": 82.318,
-      "duration_s": 5.391,
-      "mode": "REVEAL",
-      "layout": "compare_2col",
-      "labels": [
-        "Prioritizing sleep is as essential as nutrition",
-        "Exercise for overall well‑being and longevity"
-      ],
-      "narration": "Prioritizing sleep is as essential as nutrition and exercise for overall well‑being and longevity."
+      "narration": "Sleep problems that last for weeks, such as loud snoring with daytime exhaustion, are worth discussing with a doctor."
     }
   ],
+  "ai_notes": [
+    "AI reader (gemini-text) failed: HTTP 503 from generativelanguage.googleapis.com {\n  \"error\": {\n    \"code\": 503,\n    \"message\": \"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\n    \"status\": \"UNAVAILABLE\"\n  }\n}; using the extractive baseline.",
+    "No reference text and no AI reader: nothing to build the claims from."
+  ],
   "ai_images": {
-    "provider": "pollinations-image",
+    "provider": "cloudflare-image",
     "online": true,
-    "scenes_with_image": 0,
-    "scenes_total": 16,
+    "scenes_with_image": 8,
+    "scenes_total": 8,
     "from_cache": 0,
-    "errors": [
-      "AI01: HTTP 402 from image.pollinations.ai {\"status\":402,\"success\":false,\"error\":{\"code\":\"FREE_LIMIT\",\"message\":\"Free limit reached: 1 image every 45 seconds per IP. Retry after 30s, or get unlimited images with a pollen key at https://enter.pollinations.ai/?ref=classic\",\"timestamp\":\"2026-11-22T12:56:11.097Z\",\"fixUrl\":\"https://enter.pollinat",
-      "AI02: HTTP 402 from image.pollinations.ai {\"status\":402,\"success\":false,\"error\":{\"code\":\"FREE_LIMIT\",\"message\":\"Free limit reached: 1 image every 45 seconds per IP. Retry after 14s, or get unlimited images with a pollen key at https://enter.pollinations.ai/?ref=classic\",\"timestamp\":\"2026-11-22T12:56:27.289Z\",\"fixUrl\":\"https://enter.pollinat",
-      "AI03: skipped (provider failed twice in a row)",
-      "AI04: skipped (provider failed twice in a row)",
-      "AI05: skipped (provider failed twice in a row)",
-      "AI06: skipped (provider failed twice in a row)",
-      "AI07: skipped (provider failed twice in a row)",
-      "AI08: skipped (provider failed twice in a row)",
-      "AI09: skipped (provider failed twice in a row)",
-      "AI10: skipped (provider failed twice in a row)",
-      "AI11: skipped (provider failed twice in a row)",
-      "AI12: skipped (provider failed twice in a row)",
-      "AI13: skipped (provider failed twice in a row)",
-      "AI14: skipped (provider failed twice in a row)",
-      "AI15: skipped (provider failed twice in a row)",
-      "AI16: skipped (provider failed twice in a row)"
-    ]
+    "errors": []
   },
   "quality": "standard"
 }

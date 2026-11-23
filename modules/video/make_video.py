@@ -159,7 +159,8 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
                soft_subtitles: bool = True, render: bool = True, work_dir: Optional[Path] = None,
                style: Style = Style(), progress: Optional[Callable[[float, str], None]] = None,
                max_adjustments: int = MAX_ADJUSTMENTS, visual_engine: bool = True,
-               quality: str = DEFAULT_QUALITY, art=None, visuals: Optional[Mapping[str, str]] = None) -> VideoResult:
+               quality: str = DEFAULT_QUALITY, art=None, visuals: Optional[Mapping[str, str]] = None,
+               ai_notes: Sequence[str] = ()) -> VideoResult:
     out_path = Path(out_path)
     if work_dir is None:                                  # dry run: scratch space only, nothing left behind
         work_dir = out_path.parent / (out_path.stem + "_work") if render else Path(tempfile.mkdtemp(prefix="sfs_"))
@@ -239,6 +240,8 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
 
     report = build_report(res, composed, problems, engine, state, log, style, fps, measured_s, render_info,
                           out_path if render else None)
+    if ai_notes:
+        report["ai_notes"] = list(ai_notes)
     if art is not None and fmt == OutputFormat.INFOGRAPHIC:
         report["ai_images"] = art.summary(total_scenes)
         report["notes"] = report.get("notes", []) + [
@@ -343,11 +346,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--quality", choices=list(QUALITY_PROFILES), default=DEFAULT_QUALITY,
                     help="output quality: draft 480p / standard 720p (default) / high 1080p")
     ap.add_argument("--dry-run", action="store_true", help="plan, compose and check everything but write no video")
-    ap.add_argument("--ai-read", choices=["off", "pollinations", "gemini"], default="off",
+    ap.add_argument("--ai-read", choices=["off", "auto", "pollinations", "gemini"], default="off",
                     help="an LLM reads your topic / reference text and writes the claims and a picture description per scene "
-                         "(online: your text is sent to the provider; needs --allow-online). gemini needs GEMINI_API_KEY (free key)")
-    ap.add_argument("--ai-image", choices=["off", "pollinations", "folder"], default="off",
-                    help="AI picture of each claim (INFOGRAPHIC). pollinations = free, online; folder = pictures you made by hand "
+                         "(online: your text is sent to the provider; needs --allow-online). auto = Gemini if GEMINI_API_KEY is set, else (or if it fails) Pollinations; gemini needs GEMINI_API_KEY (free key)")
+    ap.add_argument("--ai-image", choices=["off", "pollinations", "cloudflare", "folder"], default="off",
+                    help="AI picture of each claim (INFOGRAPHIC). pollinations = free, online (1 image / 45 s); cloudflare = free 10,000 neurons/day, needs CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN; folder = pictures you made by hand "
                          "in Google Flow / ImageFX named <claim_id>.png (see --ai-folder)")
     ap.add_argument("--ai-folder", type=Path, default=None, help="folder for --ai-image folder, and where the prompt kit is written")
     ap.add_argument("--export-kit", action="store_true", help="write prompts.md/json (one prompt per scene) to --ai-folder and stop")
@@ -425,7 +428,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     r = make_video(a.request, claims, out, engine=engine, voice=voice, speed=a.speed, reference_text=reference,
                    fps=a.fps, burn_subtitles=not a.no_burn, soft_subtitles=not a.no_soft_subs,
                    render=not a.dry_run, progress=show, visual_engine=not a.no_visual_engine, quality=a.quality,
-                   art=ai.art if ai else None, visuals=ai.visuals if ai else None)
+                   art=ai.art if ai else None, visuals=ai.visuals if ai else None,
+                   ai_notes=ai.notes if ai else ())
     print()
     for line in r.log:
         print("  adjust:", line)

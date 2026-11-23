@@ -48,7 +48,7 @@ class GeminiLLM:
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None, timeout: float = 120.0):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY", "")
-        self.model = model or os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
+        self.model = model or os.environ.get("GEMINI_TEXT_MODEL", "gemini-3.8-flash")
         self.timeout = timeout
         if not self.api_key:
             raise AIError("GEMINI_API_KEY is not set (create a free key at https://aistudio.google.com/apikey)")
@@ -66,12 +66,37 @@ class GeminiLLM:
             raise AIError(f"unexpected answer from Gemini: {raw[:120]!r}") from exc
 
 
-LLM_CHOICES = ("off", "pollinations", "gemini")
+class FallbackLLM:
+    """Try the providers in order; the first one that answers wins (Gemini busy -> Pollinations)."""
+    name = "auto"
+
+    def __init__(self, providers: list):
+        self.providers, self.used = providers, ""
+
+    def complete(self, system: str, user: str) -> str:
+        last: Optional[AIError] = None
+        for p in self.providers:
+            try:
+                out = p.complete(system, user)
+                self.used = p.name
+                self.name = f"auto({p.name})"
+                return out
+            except AIError as exc:
+                last = exc
+        raise last or AIError("no AI reader is available")
+
+
+LLM_CHOICES = ("off", "auto", "pollinations", "gemini")
 
 
 def make_llm(kind: str) -> Optional[LLM]:
     if kind == "off":
         return None
+    if kind == "auto":                                   # Gemini when a key is set, then Pollinations
+        chain: list = []
+        if os.environ.get("GEMINI_API_KEY", "").strip():
+            chain.append(GeminiLLM())
+        return FallbackLLM(chain + [PollinationsLLM()])
     if kind == "pollinations":
         return PollinationsLLM()
     if kind == "gemini":

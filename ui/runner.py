@@ -237,7 +237,8 @@ def generate(p: GenParams, progress: Optional[Callable[[float, str], None]] = No
                      reference_text=p.reference if p.source == "text" else "", t_target=p.t_target, budget=p.budget,
                      output_format=OutputFormat(p.fmt), burn_subtitles=p.subtitles == "burn",
                      soft_subtitles=p.subtitles != "off", visual_engine=p.topic_aware, progress=progress, quality=p.quality,
-                     art=ai.art if ai else None, visuals=ai.visuals if ai else None)
+                     art=ai.art if ai else None, visuals=ai.visuals if ai else None,
+                     ai_notes=ai.notes if ai else ())
     facts = facts_from_pipeline(res.pipeline, len(claims))
     silent = bool(res.report.get("voice_is_silent")) if res.ok else None
     if not res.ok:

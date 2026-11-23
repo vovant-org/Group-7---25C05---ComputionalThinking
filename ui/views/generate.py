@@ -6,11 +6,10 @@ import streamlit as st
 from ui import components as C
 from ui import runner
 from ui import state as S
-from ui.adapters import stage_view
+from ui.adapters import LiveStages, stage_view
 from ui.widgets import btn, html, rerun
 
-WAIT_NOTE = ("The planner, narration and timeline steps run first as one job, so their results appear when it finishes. "
-             "Frame rendering reports live progress below.")
+LIVE_NOTE = "Each step shows Waiting, Working or Done as the backend reaches it."
 
 
 def _back() -> None:
@@ -21,23 +20,42 @@ def _back() -> None:
 def render() -> None:
     ss = st.session_state
     job = ss.get("job")
-    html(C.heading("Creating your video", "Each stage turns green only after the backend confirms it."))
+    html(C.heading("Creating your video", "A step turns green only after the backend reports it finished."))
     left, right = st.columns([1.35, 1], gap="large")
 
     if job is not None:                                           # ---- run the real generation, once
         ss["job"] = None                                          # a rerun during the run must not start a second job
         with left:
             tracker = st.empty()
-            tracker.markdown(C.progress_tracker(stage_view(None), "Working on it…", WAIT_NOTE, pending_label="Waiting"), unsafe_allow_html=True)
+            live = LiveStages()
+
+            def draw() -> None:
+                sub = f"Adjusting: {live.note}" if live.note else LIVE_NOTE
+                tracker.markdown(C.progress_tracker(live.view(), "Working on it…", sub, pending_label="Waiting"), unsafe_allow_html=True)
+                frac, text = live.progress()
+                bar.progress(frac, text=text)
         with right:
             note = st.empty()
             note.markdown(C.alert("info", "Generating", "This usually takes 30–60 s for a 90 s video. Keep this page open."), unsafe_allow_html=True)
-            bar = st.progress(0.0, text="Planning and measuring narration…")
+            bar = st.progress(0.0, text="Starting…")
+        draw()
 
-        def on_progress(frac: float, msg: str) -> None:
-            bar.progress(min(1.0, max(0.0, frac)), text=f"Rendering frames · {msg}")
+        def on_stage(key: str, state: str, detail: str = "") -> None:
+            live.update(key, state, detail)
+            draw()
 
-        outcome = runner.generate(job, progress=on_progress)
+        last = {"msg": None}
+
+        def on_progress(frac: float, msg: str) -> None:             # frames: redraw only when the scene changes
+            live.set_render(min(1.0, max(0.0, frac)), msg)
+            if msg != last["msg"]:
+                last["msg"] = msg
+                draw()
+            else:
+                frac, text = live.progress()
+                bar.progress(frac, text=text)
+
+        outcome = runner.generate(job, progress=on_progress, on_stage=on_stage)
         bar.empty()
         tracker.empty()                                           # the working view must not stay next to the result
         note.empty()

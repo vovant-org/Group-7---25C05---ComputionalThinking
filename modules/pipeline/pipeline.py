@@ -131,29 +131,43 @@ def run_pipeline(request: Request, claims: Sequence[Claim], *,
                  pad_s: float = 0.0,
                  voice: Optional[VoiceProfile] = None,
                  voice_speed: float = 1.0,
-                 unavailable_modes: frozenset = frozenset()) -> PipelineResult:
+                 unavailable_modes: frozenset = frozenset(),
+                 on_stage: Optional[Callable[[str, str, str], None]] = None) -> PipelineResult:
     """Run the five stages in order and stop at the first one that fails.
 
     `voice` / `voice_speed` come from the voice library; ValueError if the speed is out of range.
     `unavailable_modes`: render modes that cannot be produced right now (for example CLIP while no
-    image-to-video provider is connected). The Budget Optimizer then plans without them."""
+    image-to-video provider is connected). The Budget Optimizer then plans without them.
+
+    `on_stage(key, state, detail)` is called as the work happens, so a UI can show real progress. `state` is
+    "start", "done" or "failed"; `key` is a Stage value, or "claims" (claim selection, inside the scene stage) or
+    "narration_audio" (the voice engine measuring each scene's real audio, inside the timeline stage)."""
+    emit = on_stage or (lambda *_: None)
+
+    def stop(res_: PipelineResult, stage: Stage, status: PipelineStatus, summary: str, messages: Sequence[str] = ()) -> PipelineResult:
+        out = _stop(res_, stage, status, summary, messages)
+        emit(stage.value, "failed", " ".join(list(messages)[:2]) or summary)
+        return out
+
     planning_wpm = voice.planning_wpm(voice_speed) if voice is not None else VOICE_WPM
     tts = tts or MockTTS(**{**DEFAULT_TTS_PARAMS, "true_wpm": planning_wpm})
     res = PipelineResult(request=request, voice_profile=voice, voice_speed=voice_speed,
                          planning_wpm=planning_wpm)
 
     # 1. Router -------------------------------------------------------------
+    emit(Stage.ROUTER.value, "start", "")
     d = route(request, router_algorithm)
     res.decision = d
     res.messages.extend(d.messages)
     if d.status == RouteStatus.REJECT:
-        return _stop(res, Stage.ROUTER, PipelineStatus.ROUTER_REJECTED,
+        return stop(res, Stage.ROUTER, PipelineStatus.ROUTER_REJECTED,
                      f"REJECT {sorted(d.codes)}")
     if d.status == RouteStatus.CLARIFY:
-        return _stop(res, Stage.ROUTER, PipelineStatus.ROUTER_CLARIFY,
+        return stop(res, Stage.ROUTER, PipelineStatus.ROUTER_CLARIFY,
                      f"CLARIFY {sorted(d.codes)}")
     res.stages.append(StageLog(Stage.ROUTER, True,
                                f"ACCEPT: {d.fmt.value}, {d.t_target} s, {d.word_count} input words"))
+    emit(Stage.ROUTER.value, "done", f"{d.fmt.value.title()} video, {d.t_target} s target, {d.word_count} input words")
     profile = PROFILES[d.fmt]
     if unavailable_modes:
         profile = replace(profile, allowed_modes=tuple(m for m in profile.allowed_modes
@@ -163,7 +177,7 @@ def run_pipeline(request: Request, claims: Sequence[Claim], *,
     if voice is not None:
         spoken = detect_language(" ".join(c.text for c in claims))
         if spoken is not None and spoken != voice.language:
-            return _stop(res, Stage.VOICE, PipelineStatus.VOICE_LANGUAGE_MISMATCH,
+            return stop(res, Stage.VOICE, PipelineStatus.VOICE_LANGUAGE_MISMATCH,
                          f"voice {voice.name} speaks {voice.language}, narration is {spoken}",
                          [f"The narration is in {LANGUAGES[spoken]} but the voice {voice.name} speaks "
                           f"{LANGUAGES[voice.language]}. Choose a voice for {LANGUAGES[spoken]} narration, "
@@ -171,30 +185,37 @@ def run_pipeline(request: Request, claims: Sequence[Claim], *,
 
     # 2. Scene Segmenter ----------------------------------------------------
     params = SegParams(wpm=planning_wpm)
+    emit("claims", "start", "")
     res.selection = select_claims(list(claims), d.t_target, selection_algorithm, params)
+    emit("claims", "done", f"{len(res.selection.claims)} of {len(claims)} claims selected ({res.selection.algorithm})")
+    emit(Stage.SCENES.value, "start", "")
     res.scenes, res.scene_report = build_scenes(res.selection, d.fmt, params, profile.t_min, profile.t_max)
     rep = res.scene_report
     if not rep["scene_count_ok"]:
-        return _stop(res, Stage.SCENES, PipelineStatus.SCENES_INVALID,
+        return stop(res, Stage.SCENES, PipelineStatus.SCENES_INVALID,
                      f"{rep['n_scenes']} scenes (need 6-30)",
                      ["Not enough usable claims to build 6-30 scenes; add claims or change the duration."])
     res.stages.append(StageLog(Stage.SCENES, True,
                                f"{rep['n_scenes']} scenes, {len(res.selection.claims)}/{len(claims)} claims "
                                f"({res.selection.algorithm}), estimated {rep['total_s']} s"))
+    emit(Stage.SCENES.value, "done", f"{rep['n_scenes']} scenes, about {rep['total_s']} s before narration is measured")
 
     # 3. Budget Optimizer ---------------------------------------------------
+    emit(Stage.BUDGET.value, "start", "")
     res.budget, res.budget_source = _resolve_budget(request, res.scenes, profile)
     res.optimize = optimize(res.scenes, res.budget, profile, optimizer_algorithm)
     if not res.optimize.feasible:
-        return _stop(res, Stage.BUDGET, PipelineStatus.BUDGET_INFEASIBLE,
+        return stop(res, Stage.BUDGET, PipelineStatus.BUDGET_INFEASIBLE,
                      f"INFEASIBLE at budget {res.budget}: {res.optimize.reason}",
                      [m for m in (res.optimize.reason, res.optimize.suggestion) if m])
     o = res.optimize
     res.stages.append(StageLog(Stage.BUDGET, True,
                                f"cost {o.total_cost}/{res.budget} ({res.budget_source} budget), "
                                f"motion {o.motion_ratio:.0%} ({o.algorithm})"))
+    emit(Stage.BUDGET.value, "done", f"{o.total_cost} of {res.budget} credits, {o.motion_ratio:.0%} of scenes move")
 
     # 4. Voice Segmenter ----------------------------------------------------
+    emit(Stage.VOICE.value, "start", "")
     sentences = [s for sc in res.scenes for s in split_sentences(sc.narration)]
     voice_params = VoiceParams(wpm=planning_wpm)
     res.voice = segment_voices(sentences, voice_algorithm, voice_params)
@@ -204,14 +225,19 @@ def run_pipeline(request: Request, claims: Sequence[Claim], *,
     res.stages.append(StageLog(Stage.VOICE, True,
                                f"{len(res.voice.units)} voice units, {res.voice_in_band_share:.0%} in "
                                f"10-12 s band (estimated, {res.voice.algorithm}){who}"))
+    emit(Stage.VOICE.value, "done", f"{len(res.voice.units)} voice units")
 
     # 5. Timeline Assembler -------------------------------------------------
+    emit("narration_audio", "start", "")
     durations = scene_audio_durations(res.scenes, tts)
+    emit("narration_audio", "done", f"{len(res.scenes)} scenes of narration measured")
+    emit(Stage.TIMELINE.value, "start", "")
     res.timeline = assemble(res.scenes, durations, profile, d.t_target, pad_s)
     tl = res.timeline
     summary = f"total {tl.total_s:.1f} s vs target {tl.t_target:.0f} s (deviation {tl.deviation:.1%})"
     if not tl.ok:
-        return _stop(res, Stage.TIMELINE, PipelineStatus.TIMELINE_CHECKS_FAILED,
+        return stop(res, Stage.TIMELINE, PipelineStatus.TIMELINE_CHECKS_FAILED,
                      f"{summary}; codes {sorted(tl.codes)}")
     res.stages.append(StageLog(Stage.TIMELINE, True, summary + "; S12/S13 hold"))
+    emit(Stage.TIMELINE.value, "done", f"{tl.total_s:.1f} s timeline, {tl.deviation:.1%} from target")
     return res

@@ -260,8 +260,8 @@ def test_theme_uses_the_palette_of_the_brief():
 
 def test_stepper_marks_done_current_and_pending_steps():
     html = C.stepper(["Question", "Format", "Voice", "Budget"], 3)
-    assert html.count("sf-step done") == 2 and html.count("sf-step on") == 1
-    assert html.count('class="sf-step ') == 4 and html.count("sf-step-line") == 3
+    assert html.count("sf-wiz-step done") == 2 and html.count("sf-wiz-step on") == 1
+    assert html.count('class="sf-wiz-step ') == 4 and html.count("sf-wiz-line") == 3
     assert "<br" not in html and "\n" not in html
 
 
@@ -280,3 +280,12 @@ def test_dark_is_the_default_and_light_adds_its_palette():
 
 def test_dark_css_has_no_fixed_button_colours_left():
     assert "#1e2230 !important" not in CSS and "var(--sf-btn-bg)" in CSS
+
+
+def test_wizard_stepper_does_not_reuse_the_progress_trackers_class_names():
+    wiz = C.stepper(["A", "B"], 1)
+    tracker = C.progress_tracker([{"title": "T", "desc": "d", "state": "running"}], "h")
+    assert 'class="sf-step ' not in wiz and 'class="sf-steps"' not in wiz and "sf-wiz" in wiz
+    assert 'class="sf-steps"' in tracker and 'class="sf-step running"' in tracker
+    assert ".sf-wiz-step" in CSS and ".sf-wiz{" in CSS
+    assert ".sf-steps{display:flex;align-items:center" not in CSS          # the old wizard rule that bent the tracker

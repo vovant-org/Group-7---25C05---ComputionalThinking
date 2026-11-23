@@ -192,6 +192,83 @@ def stage_view(facts: Optional[dict], *, video_ok: Optional[bool] = None, criter
     return out
 
 
+# ------------------------------------------------------------------------------------ live progress
+# backend event key (modules/pipeline/pipeline.py on_stage, modules/video/make_video.py) -> (UI stage, does "done" finish it?)
+_LIVE = {"ai_read": ("understanding", False), "router": ("understanding", True), "claims": ("planning", True), "scene_segmenter": ("scenes", True),
+         "budget_optimizer": ("budget", True), "voice_segmenter": ("narration", False), "narration_audio": ("narration", True),
+         "timeline_assembler": ("timeline", False), "render": ("timeline", True), "verify": ("verify", True)}
+_RUNNING_NOTE = {"understanding": "Checking the format, length and input limits…", "planning": "Selecting the most important claims…",
+                 "scenes": "Building scenes and choosing a layout for each…", "budget": "Choosing a render mode for each scene…",
+                 "narration": "Splitting the script and measuring the real narration length…",
+                 "timeline": "Placing scenes, voice and subtitles on the timeline…", "verify": "Measuring the finished video…"}
+
+
+class LiveStages:
+    """Folds the backend's stage events into the seven UI stages while a video is being made.
+
+    A stage is `running` from its "start" event and `done` only when the backend reports it finished, so the
+    tracker never shows progress the backend has not made. A new "router" start means the pipeline began again
+    (the backend re-plans when the measured narration misses the target), so every stage starts over.
+    """
+
+    def __init__(self) -> None:
+        self.note = ""                  # the latest re-plan message, if any
+        self.render_frac = 0.0
+        self.rendering = False
+        self._reset()
+
+    def _reset(self) -> None:
+        self._state = {k: "pending" for k, _, _ in STAGES}
+        self._detail = {k: "" for k, _, _ in STAGES}
+        self.render_frac, self.rendering = 0.0, False
+
+    def update(self, key: str, state: str, detail: str = "") -> None:
+        if key == "replan":                 # the backend missed the target and tries again: the stage that "failed" is working again
+            self.note = detail
+            for k, v in self._state.items():
+                if v == "failed":
+                    self._state[k], self._detail[k] = "running", f"Adjusting: {detail}" if detail else ""
+            return
+        if key not in _LIVE:
+            return
+        if key == "router" and state == "start":
+            self._reset()
+        ui, completes = _LIVE[key]
+        if key == "render" and state == "start":
+            self.rendering = True
+            self._detail[ui] = "Rendering frames…"
+        if state == "start":
+            if self._state[ui] != "done":
+                self._state[ui] = "running"
+        elif state == "done":
+            if detail:
+                self._detail[ui] = detail
+            if completes:
+                self._state[ui] = "done"
+        elif state == "failed":
+            self._state[ui], self._detail[ui] = "failed", detail
+
+    def set_render(self, frac: float, msg: str) -> None:
+        """Progress text from the video builder: "AI picture 3/12" while pictures are made, "scene 4/12" while rendering."""
+        if msg.startswith("AI picture"):
+            self._detail["timeline"] = f"Making {msg}"
+            return
+        self.render_frac = frac
+        self._detail["timeline"] = f"Rendering frames · {msg}"
+
+    def view(self) -> list[dict]:
+        return [{"key": k, "title": t, "desc": d, "state": self._state[k],
+                 "detail": self._detail[k] or (_RUNNING_NOTE[k] if self._state[k] == "running" else "")} for k, t, d in STAGES]
+
+    def progress(self) -> tuple[float, str]:
+        """(0..1, text) for the bar: finished stages count in full, frame rendering counts by its own fraction."""
+        n = len(STAGES)
+        done = sum(1 for v in self._state.values() if v == "done")
+        part = self.render_frac if (self.rendering and self._state["timeline"] == "running") else 0.0
+        running = next((t for k, t, _ in STAGES if self._state[k] == "running"), "")
+        return min(1.0, (done + part) / n), (f"{running}…" if running else ("Finishing…" if done == n else "Working…"))
+
+
 # ----------------------------------------------------------------------------------- input validation
 def validate_inputs(*, topic: str, instructions: str, reference: str, source: str, claims_text: Sequence[str],
                     voice_language: str, ffmpeg_ok: bool, upload_error: str = "", online_ok: bool = True,

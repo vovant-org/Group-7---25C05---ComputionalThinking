@@ -159,7 +159,9 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
                soft_subtitles: bool = True, render: bool = True, work_dir: Optional[Path] = None,
                style: Style = Style(), progress: Optional[Callable[[float, str], None]] = None,
                max_adjustments: int = MAX_ADJUSTMENTS, visual_engine: bool = True,
-               quality: str = DEFAULT_QUALITY, art=None, visuals: Optional[Mapping[str, str]] = None) -> VideoResult:
+               quality: str = DEFAULT_QUALITY, art=None, visuals: Optional[Mapping[str, str]] = None,
+               ai_notes: Sequence[str] = (),
+               on_stage: Optional[Callable[[str, str, str], None]] = None) -> VideoResult:
     out_path = Path(out_path)
     if work_dir is None:                                  # dry run: scratch space only, nothing left behind
         work_dir = out_path.parent / (out_path.stem + "_work") if render else Path(tempfile.mkdtemp(prefix="sfs_"))

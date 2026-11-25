@@ -35,6 +35,8 @@ from modules.voice_library.library import ENGINE_EDGE, SAMPLE_TEXT, VoiceLibrary
 
 PREVIEW_DIR = OUTPUT_DIR / "voice_previews"      # git-ignored cache of live previews
 BUNDLED_DIR = PROJECT_ROOT / "assets" / "voice_previews"   # committed samples, one per voice
+RETRY_ATTEMPTS = 5                               # the online service / the network fail at random: try again
+RETRY_PAUSE_S = 2.0                              # wait 2 s, 4 s, 6 s ... between attempts
 TIMEOUT_S = 25.0                                 # report R7: a timeout, then a clear failure
 
 
@@ -88,8 +90,24 @@ def _run(make_coro):
         exc = box["error"]
         if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
             raise TTSUnavailable(f"the TTS service did not answer within {TIMEOUT_S:.0f} s") from exc
-        raise TTSUnavailable(f"TTS request failed ({type(exc).__name__}: {exc}). Check the internet connection.") from exc
+        hint = (" Try  pip install -U edge-tts  (Microsoft changes the service, old versions stop working)."
+                if type(exc).__name__ in ("NoAudioReceived", "WebSocketError", "UnexpectedResponse") else "")
+        raise TTSUnavailable(f"TTS request failed ({type(exc).__name__}: {exc}). Check the internet connection.{hint}") from exc
     return box["value"]
+
+
+def run_with_retry(make_coro, attempts: Optional[int] = None, pause_s: Optional[float] = None):
+    """`_run`, repeated a few times: the online service (or the network, e.g. a DNS hiccup) sometimes fails at random."""
+    import time
+    attempts = RETRY_ATTEMPTS if attempts is None else attempts
+    pause_s = RETRY_PAUSE_S if pause_s is None else pause_s
+    for i in range(attempts):
+        try:
+            return _run(make_coro)
+        except TTSUnavailable:
+            if i == attempts - 1:
+                raise
+            time.sleep(pause_s * (i + 1))
 
 
 def synthesize_preview(voice: VoiceProfile, speed: float = 1.0, text: Optional[str] = None,
@@ -109,7 +127,7 @@ def synthesize_preview(voice: VoiceProfile, speed: float = 1.0, text: Optional[s
         await edge_tts.Communicate(text, voice.engine_voice, rate=rate_string(speed)).save(str(part))
 
     try:
-        _run(save)
+        run_with_retry(save)
         if not part.exists() or part.stat().st_size == 0:
             raise TTSUnavailable("the TTS service returned no audio")
         part.replace(path)                       # only a complete file ever gets the final name

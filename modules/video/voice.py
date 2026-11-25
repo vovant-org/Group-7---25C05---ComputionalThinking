@@ -147,13 +147,21 @@ class EdgeEngine:
 
     def synthesize(self, text: str, dest_stem: Path) -> Path:
         mod = edge._require_package()
+        text = text.strip()
+        if not text:
+            raise edge.TTSUnavailable("there is no text to read aloud")
         path = dest_stem.with_suffix(".mp3")
         rate = edge.rate_string(self.speed)
 
         async def save():
             await mod.Communicate(text, self.voice.engine_voice, rate=rate).save(str(path))
 
-        edge._run(save)
+        try:
+            edge.run_with_retry(save)
+        except edge.TTSUnavailable as exc:
+            raise edge.TTSUnavailable(f"voice '{self.voice.name}' ({self.voice.engine_voice}): {exc} "
+                                      f"If other voices work, choose another voice. "
+                                      f"Text sent ({len(text)} characters): {text[:90]!r}") from exc
         if not path.exists() or path.stat().st_size == 0:
             raise edge.TTSUnavailable("the TTS service returned no audio")
         return path

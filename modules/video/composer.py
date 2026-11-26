@@ -367,7 +367,11 @@ def _ai_visual(chunks, st: Style, accent, art: Optional[Image.Image] = None, **_
     w, h = box[2] - box[0], box[3] - box[1]
     img, d = _layer(st)
     d.rounded_rectangle((box[0] + 5, box[1] + 7, box[2] + 5, box[3] + 7), 22, fill=(20, 30, 60, 40))
-    pic = ImageOps.fit(art.convert("RGB"), (w, h), Image.LANCZOS, centering=(0.5, 0.45)).convert("RGBA")
+    rgb = art.convert("RGB")
+    # Fit the WHOLE picture (never crop its edges); the margin is filled with the picture's own background colour,
+    # so an AI picture on a plain background blends into the panel instead of losing the pot / hands / mountain tops.
+    bg = rgb.getpixel((min(3, rgb.width - 1), min(3, rgb.height - 1)))
+    pic = ImageOps.pad(rgb, (w, h), Image.LANCZOS, color=bg, centering=(0.5, 0.5)).convert("RGBA")
     mask = Image.new("L", (w, h), 0)
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, w - 1, h - 1), 22, fill=255)
     img.paste(pic, (box[0], box[1]), mask)

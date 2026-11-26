@@ -41,7 +41,15 @@ Rules:
 - "visual": an ENGLISH description (max 30 words) of ONE simple picture that shows exactly what the claim says:
   the main objects, what they do, and the setting. No text, letters, numbers, logos or real people's names.
   Keep it family-friendly and symbolic: prefer objects, icons and simple scenes (moon, brain, clock, plant, cup) and
-  avoid people lying down, bodies or skin, because image services reject such prompts."""
+  avoid people lying down, bodies or skin, because image services reject such prompts.
+  If the claim is abstract (an attitude, a skill, a trend of ideas), do not describe the idea itself: choose exactly
+  ONE concrete, familiar metaphor object or scene that a child would recognise (a tree bending in the wind but not
+  breaking for flexibility, a key for persistence, a light bulb for an idea, a seed growing for learning) and say what
+  it is doing. Never describe landscapes, abstract shapes or lines with no clear subject.
+  The picture generator PRINTS every word it reads onto the objects, so the description must not contain objects that
+  carry writing (price tags, signs, labels, documents, forms, receipts, calendars, books, screens, charts, dials with
+  words, banknotes) nor words such as price, tax, rate, percent, and never a digit or a currency symbol. Use coins,
+  baskets, shops, buildings, gears, scales, plants and arrows instead."""
 
 _RULE_REF = ('- The claim MUST be a sentence of the reference text, copied or only trimmed. Never add a fact, a number '
              'or a word that is not in the reference text.')

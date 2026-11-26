@@ -4,7 +4,7 @@ import io
 import json
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from core.models import Scene
 from modules.ai import images as I
@@ -112,6 +112,45 @@ def test_prompt_forbids_text_in_the_picture():
     assert "no text" in p and "no numbers" in p and p.startswith("a moon over a bed.")
 
 
+def test_prompt_asks_for_white_background_and_margin():
+    # one background for every scene (a blue one broke the look) and room around the subject (no cropped objects)
+    p = I.build_prompt("a seed growing in a pot")
+    assert "white background" in p and "margin" in p and "centered" in p
+    assert "light background" not in p
+
+
+@pytest.mark.parametrize("visual", [
+    "a hand putting a price tag with a dollar sign on a basket of fruit",
+    "a bank building with an interest rate dial and a tax document, 5% and $550",
+    "a worker holding a paper report next to a calendar and a sign",
+])
+def test_prompt_drops_what_makes_the_image_model_print_writing(visual):
+    # screenshots showed "$550", "PRICE", "interest rate", "Tax" painted inside the pictures (S15: text comes from code)
+    p = I.build_prompt(visual)
+    body = p.split(". clean flat vector")[0].lower()
+    for bad in ("$", "%", "price", "tax", "interest rate", "calendar", "document", "report", "sign"):
+        assert bad not in body, (bad, body)
+    assert not any(ch.isdigit() for ch in body)
+    assert "no text" in p and "no numbers" in p
+    assert len(body) >= 8
+
+
+def test_sanitize_keeps_a_clean_description_and_never_returns_empty():
+    assert I.sanitize_visual("a moon over a bed") == "a moon over a bed"
+    assert I.sanitize_visual("a piggy bank with a coin") == "a piggy bank with a coin"
+    assert I.sanitize_visual("price tax 50%") == "a simple abstract scene"
+
+
+def test_reader_prompt_forbids_objects_that_carry_writing():
+    from modules.ai.reader import SYSTEM
+    assert "PRINTS" in SYSTEM and "price tags" in SYSTEM and "currency symbol" in SYSTEM
+
+
+def test_reader_prompt_asks_for_a_concrete_metaphor_for_abstract_claims():
+    from modules.ai.reader import SYSTEM
+    assert "abstract" in SYSTEM and "metaphor" in SYSTEM and "ONE concrete" in SYSTEM
+
+
 def test_service_caches_by_prompt(tmp_path):
     prov = FakeProvider()
     art = I.ArtService(prov, tmp_path)
@@ -177,6 +216,34 @@ def test_ai_visual_layout_keeps_text_from_the_claim():
     assert abs(int(frame[300, 200, 2]) - 200) < 40                 # the picture is on the left
     plain = compose_scene(sc, text, index=0, total=3)
     assert plain.layout != "ai_visual" and not plain.has_art       # no art -> the old drawn layout, unchanged
+
+
+def _magenta_box(width, height):
+    """A white picture with a thick magenta frame 6 px from its edge: any cropping removes part of the frame."""
+    im = Image.new("RGB", (width, height), (255, 255, 255))
+    d = ImageDraw.Draw(im)
+    d.rectangle((6, 6, width - 7, height - 7), outline=(255, 0, 255), width=60)
+    return im
+
+
+def test_ai_visual_never_crops_the_picture():
+    import numpy as np
+    sc, text = _scene()
+    for size in ((1024, 1024), (1600, 900), (800, 1200)):          # square, wide, tall: none may lose an edge
+        cs = compose_scene(sc, text, index=0, total=3, art=_magenta_box(*size))
+        f = static_frame(cs).astype(int)
+        m = (f[..., 0] > 200) & (f[..., 1] < 90) & (f[..., 2] > 200)
+        m[:, 640:] = False                                         # the picture lives on the left half
+        ys, xs = np.where(m)
+        assert len(ys) > 0, size
+        top, bottom, left, right = ys.min(), ys.max(), xs.min(), xs.max()
+        w, h = right - left + 1, bottom - top + 1
+        k = 8                                                      # a few px inside: skips the panel's own outline
+        assert m[top + k, left + 30:right - 29].sum() > 0.8 * (w - 60), size     # top edge of the frame is still there
+        assert m[bottom - k, left + 30:right - 29].sum() > 0.8 * (w - 60), size
+        assert m[top + 30:bottom - 29, left + k].sum() > 0.8 * (h - 60), size
+        assert m[top + 30:bottom - 29, right - k].sum() > 0.8 * (h - 60), size
+        assert abs((w / h) - (size[0] / size[1])) < 0.08, size      # and the picture keeps its proportions
 
 
 # ------------------------------------------------------------------ make_video

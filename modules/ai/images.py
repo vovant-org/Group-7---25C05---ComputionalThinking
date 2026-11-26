@@ -14,6 +14,7 @@ import base64
 import hashlib
 import io
 import json
+import re
 import os
 import time
 import urllib.parse
@@ -24,14 +25,46 @@ from PIL import Image
 
 from modules.ai.net import AIError, http_request
 
-STYLE = ("clean flat vector infographic illustration, soft pastel colors on a plain light background, "
-         "simple bold shapes, one clear subject, no clutter")
+STYLE = ("clean flat vector infographic illustration, plain white background, ONE centered subject with a wide "
+         "empty margin on all sides (nothing touching the edges), limited palette of 3 to 4 soft pastel colors, "
+         "simple bold shapes, no clutter, any tag, sign, dial or paper is plain and completely blank")
 NEGATIVE = "no text, no letters, no numbers, no captions, no watermark, no logo"
 IMAGE_CHOICES = ("off", "pollinations", "cloudflare", "folder")
 
 
+# FLUX (the free Cloudflare model) ignores "no text" and prints the words of the prompt onto tags, dials and papers
+# ("PRICE", "$550", "interest rate", "Tax"). Words and numbers on screen must come from code (S15), so objects that
+# carry writing are swapped for objects that do not, and every digit / currency sign is dropped, BEFORE the request.
+_SWAPS = [
+    (r"\bprice[- ]?(?:tags?|labels?|stickers?)\b", "stack of coins"),
+    (r"\b(?:dollar|euro|pound|dong)\s+signs?\b|\bcurrency\s+symbols?\b", "coin"),
+    (r"\binterest[- ]rate\s+(?:dials?|gauges?|knobs?|meters?)\b", "round dial with tick marks only"),
+    (r"\binterest[- ]rates?\b", "round dial"),
+    (r"\b(?:tax|bank)\s+(?:forms?|documents?|papers?|bills?|returns?|statements?)\b", "coin purse"),
+]
+_DROP = re.compile(
+    r"\b(?:receipts?|invoices?|contracts?|documents?|reports?|newspapers?|books?|posters?|banners?|signs?|signboards?|"
+    r"billboards?|calendars?|labels?|captions?|barcodes?|qr codes?|screens?|monitors?|spreadsheets?|checklists?|"
+    r"certificates?|tickets?|banknotes?|papers?|sheets? of paper|price|prices|tax|taxes|percent|percentage)\b", re.I)
+
+
+def sanitize_visual(visual: str) -> str:
+    """Remove what makes an image model draw writing: text-bearing objects, price/tax words, digits, currency signs."""
+    t = " ".join(str(visual).split())
+    for pat, repl in _SWAPS:
+        t = re.sub(pat, repl, t, flags=re.I)
+    t = _DROP.sub("", t)
+    t = re.sub(r"\ban (round dial)", r"a \1", t, flags=re.I)
+    t = re.sub(r"[0-9$%\u20ac\u00a3\u20ab\u00a5#@]+", "", t)
+    t = re.sub(r"\s+([,.;:])", r"\1", t)
+    t = re.sub(r"(?:,\s*){2,}", ", ", t)
+    t = re.sub(r"\b(?:a|an|the|and|with|of|or)\s*(?=[,.;:]|$)", "", t, flags=re.I)
+    t = " ".join(t.split()).strip(" ,;:")
+    return t if len(t) >= 8 else "a simple abstract scene"
+
+
 def build_prompt(visual: str) -> str:
-    return f"{visual.strip().rstrip('.')}. {STYLE}. {NEGATIVE}."
+    return f"{sanitize_visual(visual).rstrip('.')}. {STYLE}. {NEGATIVE}."
 
 
 class ImageProvider(Protocol):

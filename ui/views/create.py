@@ -22,7 +22,7 @@ from ui import components as C
 from ui import runner
 from ui import state as S
 from ui.adapters import MAX_WORDS, count_words, estimate_from_facts, has_blocking, short_title, validate_inputs
-from ui.widgets import btn, card_button, html, stretch
+from ui.widgets import btn, card_button, html, rerun, stretch
 
 STEPS = ["Your question", "Format", "Voice", "Budget"]
 LAST = len(STEPS)
@@ -76,6 +76,7 @@ def _run_research() -> None:
         S.put("reference", res.text)
         S.put("source", "text")
         ss["ref_origin"] = "ai"
+        rerun()          # _setup() already ran on the empty box: start over so claims, language and voice see the new text
 
 
 def _pick(key: str, value) -> None:

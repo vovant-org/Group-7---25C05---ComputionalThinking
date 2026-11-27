@@ -136,6 +136,10 @@ def research_topic(question: str, llm: Optional[LLM], *, instructions: str = "",
         if best is None:
             return ResearchResult(False, language=language, provider=llm.name, error=f"The AI could not answer: {exc}")
     title, kept, rejected = best
+    from modules.video.claims import claims_from_text          # the extractor the pipeline will use on this text
+    usable = {c.text for c in claims_from_text(to_text(kept))}
+    rejected += [f"{t[:50]!r}: the sentence splitter would not keep it" for t, _ in kept if t not in usable]
+    kept = [(t, r) for t, r in kept if t in usable]
     if len(kept) < MIN_SENTENCES:
         return ResearchResult(False, language=language, provider=llm.name, rejected=rejected,
                               error=f"Only {len(kept)} usable sentence(s) after the checks (need {MIN_SENTENCES}). Try again "

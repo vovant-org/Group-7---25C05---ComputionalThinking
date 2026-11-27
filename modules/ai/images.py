@@ -259,6 +259,10 @@ class ArtService:
         self.used[key] = self.provider.name
         return img
 
+    def reset_failures(self) -> None:
+        """Re-open the circuit breaker (used before a second attempt at the scenes that still have no picture)."""
+        self._fails = 0
+
     def summary(self, total: int) -> dict:
         return {"provider": self.provider.name, "online": self.provider.online, "scenes_with_image": len(self.used),
                 "scenes_total": total, "from_cache": sum(v == "cache" for v in self.used.values()),

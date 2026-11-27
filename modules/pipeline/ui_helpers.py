@@ -30,7 +30,7 @@ LAYOUT_LABELS = {"cause_chain": "🔗 cause chain", "compare_2col": "⚖️ two-
 
 
 CUTOUT_LABELS = {"cause_effect": "cause → effect", "bars": "bars", "steps": "steps", "chart": "chart",
-                 "bulb": "idea", "bubble": "talking"}
+                 "bulb": "idea", "bubble": "talking", "ai_picture": "AI picture"}
 
 
 def layout_label(layout: Optional[str]) -> str:

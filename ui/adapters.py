@@ -380,7 +380,8 @@ def storyboard_scenes(report: dict, record: Optional[dict] = None) -> list[dict]
         if animation:
             pose = POSE_LABELS.get(t.get("pose", ""), t.get("pose", ""))
             prop = CUTOUT_LABELS.get(t.get("prop", ""), t.get("prop", ""))
-            visual = f"Stick-figure character {('(' + pose + ') ') if pose else ''}with a “{prop}” prop" if prop else "Stick-figure character"
+            visual = ("AI picture of the claim, animated by code (slide-in, zoom, float)" if t.get("prop") == "ai_picture" else
+                      (f"Stick-figure character {('(' + pose + ') ') if pose else ''}with a “{prop}” prop" if prop else "Stick-figure character"))
             if objects.get(t["scene"]):
                 visual += "; objects: " + ", ".join(objects[t["scene"]])
         else:

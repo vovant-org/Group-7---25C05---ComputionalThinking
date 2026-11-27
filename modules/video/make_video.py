@@ -209,6 +209,7 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
 
     fmt = res.decision.fmt
     total_scenes = len(res.scenes)
+    ai_mode, ai_fallback = False, ""                 # ANIMATION drawn from AI pictures (modules/video/ai_animation.py)
     if fmt == OutputFormat.INFOGRAPHIC:
         pictures: dict = {}                         # AI pictures (modules/ai): one per scene, made from the claim itself
         if art is not None and visuals:
@@ -221,7 +222,15 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
                           for i, s in enumerate(res.scenes)}
         problems = [p for cs in composed.values() for p in check_labels(cs)]
     elif fmt == OutputFormat.ANIMATION:
-        if visual_engine:                           # Topic-aware Visual Engine: objects and motion follow the content
+        composed = None
+        if art is not None and visuals:             # AI pictures cut out and animated by code; all-or-nothing (policy A)
+            from modules.video.ai_animation import collect_pictures, compose_ai_scenes
+            pictures, ai_fallback = collect_pictures(art, res.scenes, visuals, progress=progress)
+            if pictures is not None:
+                composed, ai_mode = compose_ai_scenes(res.scenes, pictures, style), True
+        if composed is not None:
+            pass
+        elif visual_engine:                           # Topic-aware Visual Engine: objects and motion follow the content
             from modules.visual_engine import analyse_topic, compose_topic_scenes
             profile = analyse_topic(request_text, [c.text for c in res.selection.claims])
             composed = compose_topic_scenes(res.scenes, profile, style)
@@ -254,9 +263,19 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
         report["notes"] = report.get("notes", []) + [
             f"AI pictures: {report['ai_images']['scenes_with_image']} of {total_scenes} scenes "
             f"({art.provider.name}); the other scenes are drawn by code. All text is still drawn by code from the claims."]
+    elif art is not None and fmt == OutputFormat.ANIMATION:
+        report["ai_images"] = art.summary(total_scenes)
+        if ai_mode:
+            report["notes"] = report.get("notes", []) + [
+                f"AI pictures: all {total_scenes} scenes use an AI picture ({art.provider.name}), cut out and animated by code. "
+                "No text is drawn inside the pictures."]
+        else:
+            report["notes"] = report.get("notes", []) + [
+                "AI pictures could not be used for every scene (" + (ai_fallback or "no picture descriptions were available")
+                + "), so the whole video is the code-drawn animation (no mix of styles)."]
     elif art is not None:
-        report["notes"] = report.get("notes", []) + ["AI pictures are used for INFOGRAPHIC only; this video is not INFOGRAPHIC."]
-    if fmt == OutputFormat.ANIMATION and visual_engine:
+        report["notes"] = report.get("notes", []) + ["AI pictures are used for INFOGRAPHIC and ANIMATION only; this video is neither."]
+    if fmt == OutputFormat.ANIMATION and visual_engine and not ai_mode:
         from modules.visual_engine.quality import run_quality
         q = run_quality(composed, res.timeline, style, t_target=res.timeline.t_target, video=out_path if render else None,
                         measured_s=measured_s, silent_engine=isinstance(engine, SilentEngine))

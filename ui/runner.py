@@ -243,7 +243,7 @@ def generate(p: GenParams, progress: Optional[Callable[[float, str], None]] = No
             on_stage("ai_read", "start", "The AI is reading your input and writing claims…" if p.ai_read != "off" else "Preparing the AI pictures…")
         try:
             ai = prepare_ai(text, p.reference if p.source == "text" else "", claims, read_kind=p.ai_read,
-                            image_kind=p.ai_image if p.fmt == "INFOGRAPHIC" else "off",
+                            image_kind=p.ai_image,
                             folder=Path(p.ai_folder) if p.ai_folder else None, allow_online=p.ai_online,
                             n_scenes=claims_for_duration(p.t_target), cache_dir=storage.videos_dir().parent / "ai_cache")
         except AIError as exc:

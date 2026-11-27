@@ -36,3 +36,19 @@ the loop (and of the size of the demo claim packs), not of the animation.
 - Animation is LAYERED cut-out drawn by code (report 5.9.10, option L2). CLIP (AI image-to-video) and HYBRID are not built.
 - The motion score measures pixel change, not whether the movement looks good. Quality was judged by watching the video.
 - Voice speeds in part B are simulated; with a real voice only the measured rate matters.
+
+## C. ANIMATION from AI pictures (design note, NOT yet measured)
+Code: `modules/video/ai_animation.py`, tests: `tests/test_ai_animation.py` (fake provider, no network).
+Each scene = one AI picture (same style prompt as the INFOGRAPHIC pictures) cut out of its plain white background
+and animated by the existing Layer/Track parts: slide-in from alternating sides, pop, float, slow zoom; the Motion
+Planner's energy scales the movement. Backdrop colour comes from the picture's dominant colour.
+
+Fallback policy A (decision of the team): scenes without a picture are retried (2 rounds, circuit breaker re-opened,
+another seed); if any scene still has none, the WHOLE video is drawn by the code-drawn animation and the report says why.
+Reason: one video must never mix AI pictures with stick figures.
+
+Not measured yet (fill in after running on a real provider; do not quote numbers before): share of pictures whose
+background was removed cleanly, share of videos that fall back, render time per video.
+Known limits: the cut-out assumes a plain background (the style prompt asks for it; FLUX schnell does not always obey);
+FLUX schnell takes no seed, so consistency between scenes comes from the shared prompt only; the subject itself does not
+move (the whole picture slides, floats and zooms), which is a limit of one still image per scene.

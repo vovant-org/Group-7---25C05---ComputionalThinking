@@ -384,19 +384,20 @@ def _step_budget(ctx: dict) -> None:
                  format_func={"off": "Off", "auto": "Auto (Gemini, then Pollinations)", "pollinations": "Pollinations (no key)", "gemini": "Gemini (free key)"}.get,
                  help="An AI reads your topic and material, picks the claims and describes one picture per scene. With reference text, "
                       "every claim must come from your text (the app checks this). Gemini needs the GEMINI_API_KEY environment variable.")
-        if ss["fmt"] == "INFOGRAPHIC":
+        if ss["fmt"] in ("INFOGRAPHIC", "ANIMATION"):
             st.radio("AI picture of each claim", ["off", "pollinations", "cloudflare", "folder"], key=S.seed("ai_image"), on_change=S.sync, args=("ai_image",),
                      horizontal=True, format_func={"off": "Off", "pollinations": "Pollinations (free, slow)", "cloudflare": "Cloudflare (free key)", "folder": "My own pictures"}.get,
                      help="Pollinations: about one picture per 15 s. My own pictures: make them in Google Flow / ImageFX and save them as "
                           "<claim id>.png in a folder (the prompt kit comes from the command line: --export-kit). Text on screen is still drawn by code.")
             if ss["ai_image"] == "folder":
                 st.text_input("Folder with the pictures", key=S.seed("ai_folder"), on_change=S.sync, args=("ai_folder",))
-        if ss["ai_read"] != "off" or (ss["fmt"] == "INFOGRAPHIC" and ss["ai_image"] in ("pollinations", "cloudflare")):
+        if ss["ai_read"] != "off" or ss["ai_image"] in ("pollinations", "cloudflare"):
             st.checkbox("I understand my text is sent to an online AI service", key=S.seed("ai_online"), on_change=S.sync, args=("ai_online",),
                         help="Do not send private or sensitive text.")
         if ss["fmt"] == "ANIMATION":
             st.checkbox("Topic-aware visuals", key=S.seed("topic_aware"), on_change=S.sync, args=("topic_aware",),
-                        help="On: objects and motion follow the topic. Off: the generic stick figure with six standard props.")
+                        help="On: objects and motion follow the topic. Off: the generic stick figure with six standard props. "
+                          "Also used when AI pictures could not be made for every scene.")
         st.text_area("Extra instructions (optional)", key=S.seed("instructions"), on_change=S.sync, args=("instructions",), height=70,
                      placeholder="e.g. keep a friendly tone, focus on everyday examples")
 

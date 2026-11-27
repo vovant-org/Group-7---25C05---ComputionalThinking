@@ -1,8 +1,0 @@
-﻿e87e21d 2026-11-17 namvuthanh15 | Animation benchmark: motion variants and duration loop
-510f7f3 2026-11-17 namvuthanh15 | Logbook: animation and UI
-16fbb98 2026-11-17 namvuthanh15 | Ignore generated videos and work folders
-99efdc0 2026-11-17 namvuthanh15 | Merge remote-tracking branch 'origin/main' into feat/nam-ui
-358b55e 2026-11-17 namvuthanh15 | Video page: format choice, tabs, balanced subtitle lines
-697c773 2026-11-16 namvuthanh15 | run demo
-041f079 2026-11-16 namvuthanh15 | Fix Pillow 13 deprecation in composer (fromarray mode)
-a8f0113 2026-11-16 namvuthanh15 | Animation format: cut-out LAYERED scenes, Motion Planner

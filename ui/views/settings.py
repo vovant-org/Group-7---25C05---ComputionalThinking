@@ -8,7 +8,7 @@ from ui import runner, storage
 from ui.widgets import html
 
 NOT_BUILT = [
-    ("Researching a topic", "The REASON step is not built. Content comes from a demo template or from your own text (sentences of 8–24 words)."),
+    ("Verified research", "The REASON step writes material with a free online AI (step 1, “Research this topic with AI”), but nothing is checked against sources: the user reviews the text."),
     ("Hybrid format", "The Router accepts it but the video maker stops with a message, so the card is disabled."),
     ("AI image-to-video clips (CLIP)", "No provider is connected, so animation scenes are LAYERED cut-outs drawn by code."),
     ("Measured speaking rates", "Voice speeds are assumed until measured (evaluation/measure_tts.py)."),

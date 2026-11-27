@@ -36,7 +36,7 @@ a bare `pip` or `streamlit` can belong to a different Python than `python`, and 
 | Buttons or inputs look white / the theme is light | Streamlit was started outside the project folder, so `.streamlit/config.toml` was not read. `cd` into the project root and restart. |
 | **Create Video** is greyed out | Read the red/amber messages above the button; each one names what to fix (empty topic, missing reference text, voice language mismatch, budget too low, FFmpeg). |
 | Video has no sound | The *Silent* voice engine is selected (the default when `pyttsx3` is not installed). Install `pyttsx3` or choose the Edge voice in the Voice tab. |
-| A topic like "Explain AI" cannot be generated | The REASON step is not built: use a demo template, or paste / upload your own reference text (full sentences of 8-24 words). |
+| A topic like "Explain AI" has no material | Press **Research this topic with AI** on step 1 (REASON step, `modules/reason`; free Gemini key or Pollinations, needs internet and your consent), then review the text. Or use a demo template, or paste / upload your own reference text (full sentences of 8-24 words). |
 
 Flow: **New Project → enter topic → configure video → see the cost estimate → Create Video → review the storyboard and timeline → download**.
 
@@ -68,7 +68,8 @@ features: `docs/ui-redesign.md`.
 | modules/pipeline + pages/2_Pipeline_lab.py | Lab04 feature: Router → Scene → Budget → Voice → Timeline, CLI + Streamlit lab page (specs/001-pipeline-demo/) |
 | ui/ + app.py | "Dark Premium AI Studio" workspace: prompt composer, configuration panel, generation progress, Video Studio (docs/ui-redesign.md) |
 | modules/visual_engine | Topic-aware Visual Engine for ANIMATION: topic analysis, per-domain kits, content-aware motion, word-level sync, quality checks (docs/topic-aware-visual-engine.md) |
-| narration script generator, real providers, REASON step | TODO |
+| modules/reason | REASON v1: a free online LLM writes reference text from a bare question; format/language/no-number checks, user review (docs/reason-step.md). Not verified against sources |
+| narration script generator, real providers, verified REASON (sources) | TODO |
 
 ## AI integration (free, optional) – INFOGRAPHIC
 An AI **reads your input** (topic and/or reference text), chooses the claims, and describes one picture that shows exactly each claim.

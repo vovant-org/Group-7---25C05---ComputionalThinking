@@ -295,8 +295,8 @@ def validate_inputs(*, topic: str, instructions: str, reference: str, source: st
                 "Without reference text the claims are written by the AI and are NOT verified. Paste your own material for a video "
                 "whose every sentence comes from your text.")
         elif not reference.strip():
-            add("err", "Add reference material", "StoryFrame builds the story from text you provide. It cannot research a topic by itself yet "
-                                                   "(the REASON step is not built). Paste text or upload a .txt / .md file, or pick a demo template.")
+            add("err", "Add reference material", "StoryFrame builds the story from text. Paste text or upload a .txt / .md file, "
+                                                   "press “Research this topic with AI” to let the AI write it, or pick a demo template.")
         elif not claims_text:
             add("err", "No usable sentences found", "Sentences of 8–24 words become the claims. Use full sentences, not a list of keywords.")
     if claims_text and detected_language and detected_language != voice_language:

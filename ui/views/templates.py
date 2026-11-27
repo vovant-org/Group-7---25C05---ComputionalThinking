@@ -23,7 +23,7 @@ def _use(pack: str, label: str, language: str, fmt: str) -> None:
 def render() -> None:
     html(C.heading("Templates", "Ready-made content to try the studio without writing anything."))
     html(C.alert("info", "Demo content, not researched content",
-                 "These are hand-written sets of claims that stand in for the REASON step, which is not built yet. "
+                 "These are hand-written sets of claims. To research your own question instead, use “Research this topic with AI” on the New Project screen. "
                  "A template fills the topic and content for you; you can still change format, voice and length."))
     items = runner.demo_templates()
     for row in range(0, len(items), 2):

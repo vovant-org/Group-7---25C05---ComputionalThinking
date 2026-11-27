@@ -8,8 +8,8 @@ extra instructions. The language is not asked: it is detected from the content (
 tone marks), and the voices offered are the ones that speak it. The voice itself is cast from the topic
 (modules/voice_library/casting.py): a calm voice for sleep, an authoritative one for economics, a lively one for
 technology... together with a matching speaking speed and pitch. The user can switch this off and pick any voice. The content source is not asked either: material typed or uploaded by the
-user is used; otherwise a ready-made demo can be picked (the REASON step is not built yet, so a topic
-alone cannot be researched).
+user is used; with a question only, the REASON step (modules/reason) can research it: a free online AI writes the
+material into the box, where the user reviews it before continuing; otherwise a ready-made demo can be picked.
 """
 from __future__ import annotations
 
@@ -51,6 +51,31 @@ def _use_demo(pack: str, label: str, language: str) -> None:
 
 def _use_own_material() -> None:
     S.put("source", "text")
+
+
+def _ask_research() -> None:
+    """Button callback: the research itself runs in the next script run, under a spinner (it takes 10-60 s)."""
+    st.session_state["research_pending"] = True
+
+
+def _on_reference() -> None:
+    S.sync("reference")
+    if not st.session_state["reference"].strip():              # box emptied: whatever comes next is not the AI's text
+        st.session_state["ref_origin"] = "user"
+        st.session_state["research_info"] = None
+
+
+def _run_research() -> None:
+    ss = st.session_state
+    ss["research_pending"] = False
+    with st.spinner("Researching your question with AI… (usually 10–60 s)"):
+        res = runner.research(ss["topic"], ss["instructions"], ss["research_ai"], float(ss["duration"]))
+    ss["research_info"] = {"ok": res.ok, "provider": res.provider, "error": res.error, "rejected": len(res.rejected),
+                           "sentences": len(res.sentences), "title": res.title}
+    if res.ok:
+        S.put("reference", res.text)
+        S.put("source", "text")
+        ss["ref_origin"] = "ai"
 
 
 def _pick(key: str, value) -> None:
@@ -100,6 +125,8 @@ def _on_upload() -> None:
     st.session_state["upload_name"] = f.name
     S.put("reference", text)
     S.put("source", "text")
+    st.session_state["ref_origin"] = "user"
+    st.session_state["research_info"] = None
 
 
 def _clear_upload() -> None:
@@ -107,6 +134,8 @@ def _clear_upload() -> None:
     st.session_state["upload_name"] = ""
     st.session_state["upload_error"] = ""
     S.put("reference", "")
+    st.session_state["ref_origin"] = "user"
+    st.session_state["research_info"] = None
 
 
 def _start() -> None:
@@ -119,7 +148,8 @@ def _start() -> None:
         engine_kind=ss["engine"], allow_online=bool(ss["allow_online"]), subtitles=ss["subtitles"],
         topic_aware=bool(ss["topic_aware"]), language=lang, quality=ss["quality"],
         ai_read=ss["ai_read"], ai_image=ss["ai_image"], ai_online=bool(ss["ai_online"]), ai_folder=ss["ai_folder"].strip(),
-        pitch_hz=int(ss["pitch"]) if ss["engine"] == "edge" else 0, voice_mood=ss["voice_mood"] if ss["auto_voice"] else "")
+        pitch_hz=int(ss["pitch"]) if ss["engine"] == "edge" else 0, voice_mood=ss["voice_mood"] if ss["auto_voice"] else "",
+        content_origin=ss["ref_origin"] if ss["source"] == "text" and ss["reference"].strip() else "user")
     ss["gen_state"] = "running"
     ss["last_outcome"] = None
     ss["view"] = "generate"
@@ -200,6 +230,8 @@ def _step_content(ctx: dict) -> None:
                      "Hand-written claims that ship with the project. You can still change the question above."))
         btn("Use my own material instead", key="own_material", on_click=_use_own_material)
     else:
+        if ss["research_pending"]:
+            _run_research()
         html(C.section("Related material (recommended)"))
         st.file_uploader("Upload material (.txt or .md)", type=["txt", "md"], key=f"w_upload_{ss['upload_n']}", on_change=_on_upload,
                          label_visibility="collapsed", help="Plain text only. It is read in this session and stays on your computer.")
@@ -207,11 +239,20 @@ def _step_content(ctx: dict) -> None:
             u1, u2 = st.columns([4, 1])
             u1.caption(f"Loaded: {ss['upload_name']}")
             u2.button("Remove", key="rm_upload", on_click=_clear_upload)
-        st.text_area("Related material", key=S.seed("reference"), on_change=S.sync, args=("reference",), height=170, label_visibility="collapsed",
-                     placeholder="Or paste the text here. Use full sentences of 8–24 words. The video is built only from this text; "
-                                 "StoryFrame cannot research a topic by itself yet.")
+        info = ss["research_info"]
+        if info and info["ok"] and ss["ref_origin"] == "ai":
+            extra = f" {info['rejected']} sentence(s) were dropped by the checks." if info["rejected"] else ""
+            html(C.alert("warn", f"Material written by AI ({info['provider']}), not verified",
+                         f"{info['sentences']} sentences. Read them and correct anything that looks wrong: the video says exactly "
+                         f"this text.{extra}"))
+        st.text_area("Related material", key=S.seed("reference"), on_change=_on_reference, height=220 if ss["ref_origin"] == "ai" else 170,
+                     label_visibility="collapsed",
+                     placeholder="Or paste the text here. Use full sentences of 8–24 words. The video is built only from this text. "
+                                 "No material? Let the AI research your question below.")
         words = count_words(ss["topic"]) + count_words(ss["reference"])
         st.markdown(f"<div class='sf-count{' over' if words > MAX_WORDS else ''}'>{words:,} / {MAX_WORDS:,} words</div>", unsafe_allow_html=True)
+
+        _research_panel()
 
         html(C.section("No material yet? Try a ready-made example"))
         demos = runner.demo_templates()
@@ -223,6 +264,32 @@ def _step_content(ctx: dict) -> None:
     _alerts(msgs)
     ok = bool(ss["topic"].strip()) and not has_blocking(msgs)
     _nav(1, can_next=ok, why="Fix the messages above first." if msgs else "Type your question first.")
+
+
+def _research_panel() -> None:
+    """REASON step: let a free online AI write the material from the question (modules/reason/research.py)."""
+    ss = st.session_state
+    own_text = bool(ss["reference"].strip()) and ss["ref_origin"] != "ai"
+    html(C.section("No material? Let AI research your question"))
+    c1, c2 = st.columns([1, 2])
+    c1.selectbox("AI provider", ["auto", "gemini", "pollinations"], key=S.seed("research_ai"), on_change=S.sync, args=("research_ai",),
+                 format_func={"auto": "Auto (Gemini, then Pollinations)", "gemini": "Gemini (free key)",
+                              "pollinations": "Pollinations (no key)"}.get,
+                 help="Gemini needs GEMINI_API_KEY (free at aistudio.google.com). Pollinations needs no key but is slower.")
+    with c2:
+        st.write("")
+        st.checkbox("I understand my question is sent to an online AI service", key=S.seed("ai_online"), on_change=S.sync,
+                    args=("ai_online",))
+    why = ("Type your question first." if not ss["topic"].strip() else
+           "Clear the material box first: AI research never overwrites your own text." if own_text else
+           "Tick the confirmation first." if not ss["ai_online"] else None)
+    label = "Research again" if ss["ref_origin"] == "ai" and ss["reference"].strip() else "Research this topic with AI"
+    btn(label, icon="auto_awesome", key="research", on_click=_ask_research, disabled=why is not None, help=why)
+    st.caption("The AI writes general, well-established explanations in the language of your question, without numbers or names. "
+               "It is not a fact-checked source: review the text before you continue.")
+    info = ss["research_info"]
+    if info and not info["ok"]:
+        html(C.alert("err", "AI research failed", f"{info['error']} You can paste your own text or pick a demo instead."))
 
 
 def _step_format(ctx: dict) -> None:

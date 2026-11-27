@@ -131,6 +131,17 @@ def cast_voice(lib: VoiceLibrary, language: str, topic: str, texts: list, instru
     return _cast(lib, language, topic, list(texts), instructions)
 
 
+def research(question: str, instructions: str, kind: str, t_target: float, language: Optional[str] = None):
+    """REASON step (modules/reason): reference text written by a free online LLM. Never raises."""
+    from modules.ai.llm import make_llm
+    from modules.reason import ResearchResult, research_topic
+    try:
+        llm = make_llm(kind)
+    except Exception as exc:                                    # no Gemini key, unknown provider, ...
+        return ResearchResult(False, language=language or "en", error=str(exc))
+    return research_topic(question, llm, instructions=instructions, language=language, t_target_s=t_target)
+
+
 # ------------------------------------------------------------------------------------------ estimate
 def estimate_plan(topic: str, instructions: str, reference: str, source: str, pack: Optional[str], fmt_value: str,
                   t_target: int, budget: Optional[int], voice_id: str, speed: float) -> dict:
@@ -171,6 +182,7 @@ class GenParams:
     ai_folder: str = ""                    # folder of hand-made pictures for ai_image == "folder"
     pitch_hz: int = 0                      # voice pitch offset (Edge voices only), proposed by voice casting
     voice_mood: str = ""                   # mood chosen by voice casting ("" = the user picked the voice)
+    content_origin: str = "user"           # "ai": the reference text was written by the REASON step (not verified)
 
 
 @dataclass
@@ -193,6 +205,7 @@ def _record(p: GenParams, pid: str, voice, engine_name: str, res, facts: dict, n
         "schema": 1, "id": pid, "title": short_title(request_text(p.topic, ""), 90), "created": time.time(),
         "request_text": request_text(p.topic, p.instructions), "instructions": p.instructions,
         "content_source": p.source, "pack": p.pack, "language": p.language,
+        **({"content_origin": p.content_origin} if p.content_origin != "user" else {}),
         "voice": {"id": voice.voice_id, "name": voice.name, "speed": f"×{p.speed:g}", "engine": engine_label(p.engine_kind),
                   "engine_id": engine_name,
                   **({"pitch": f"{p.pitch_hz:+d} Hz"} if p.pitch_hz else {}), **({"mood": p.voice_mood} if p.voice_mood else {})},

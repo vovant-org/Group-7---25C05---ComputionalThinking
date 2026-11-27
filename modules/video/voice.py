@@ -19,8 +19,11 @@ Unit tests cover the recorder with SilentEngine and a fake engine.
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 import shutil
 import subprocess
+import sys
 import wave
 from pathlib import Path
 from typing import Optional, Protocol, Sequence
@@ -111,30 +114,68 @@ class SilentEngine:
 
 
 class Pyttsx3Engine:
-    """Operating-system voice through `pyttsx3` (offline). `speed` scales the default rate."""
+    """Operating-system voice through `pyttsx3` (offline). `speed` scales the default rate.
+
+    Every text is spoken by a SEPARATE short-lived process (system_tts_worker.py) with a timeout, because
+    pyttsx3 hangs when it is used from Streamlit's script thread or reused after an interrupted rerun.
+    On Windows, if pyttsx3 fails, the built-in System.Speech (PowerShell) is tried before giving up."""
     normalised = False
+    TIMEOUT_S = 60.0
 
     def __init__(self, speed: float = 1.0, voice_hint: Optional[str] = None):
-        try:
-            import pyttsx3
-        except ImportError:
-            raise VoiceError("pyttsx3 is not installed: pip install pyttsx3") from None
-        self._engine = pyttsx3.init()
-        self._engine.setProperty("rate", int(self._engine.getProperty("rate") * speed))
-        if voice_hint:
-            for v in self._engine.getProperty("voices"):
-                if voice_hint.lower() in f"{v.id} {v.name}".lower():
-                    self._engine.setProperty("voice", v.id)
-                    break
+        import importlib.util
+        if importlib.util.find_spec("pyttsx3") is None and sys.platform != "win32":
+            raise VoiceError("pyttsx3 is not installed: pip install pyttsx3")
+        self.speed, self.voice_hint = speed, voice_hint
         self.name = f"pyttsx3-{speed:g}-{voice_hint or 'default'}"
 
+    def _run_pyttsx3(self, text: str, path: Path) -> Optional[str]:
+        """None when the wav was written, else a short reason."""
+        worker = Path(__file__).with_name("system_tts_worker.py")
+        req = json.dumps({"text": text, "path": str(path), "speed": self.speed, "voice_hint": self.voice_hint})
+        try:
+            proc = subprocess.run([sys.executable, str(worker)], input=req.encode("utf-8"), capture_output=True,
+                                  timeout=self.TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            return f"pyttsx3 did not finish within {self.TIMEOUT_S:g} s"
+        if proc.returncode != 0:
+            return "pyttsx3: " + (proc.stderr.decode("utf-8", "replace").strip()[-300:] or f"exit code {proc.returncode}")
+        return None if path.exists() and path.stat().st_size > 0 else "pyttsx3 produced an empty file"
+
+    def _run_powershell(self, text: str, path: Path) -> Optional[str]:
+        ps = shutil.which("powershell") or shutil.which("pwsh")
+        if not ps:
+            return "PowerShell not found"
+        rate = max(-10, min(10, int(round((self.speed - 1.0) * 8))))
+        script = ("Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                  f"$s.Rate = {rate}; $s.SetOutputToWaveFile($env:TTS_OUT); $s.Speak($env:TTS_TEXT); $s.Dispose()")
+        env = {**os.environ, "TTS_OUT": str(path), "TTS_TEXT": text}
+        try:
+            proc = subprocess.run([ps, "-NoProfile", "-NonInteractive", "-Command", script], capture_output=True,
+                                  timeout=self.TIMEOUT_S, env=env)
+        except subprocess.TimeoutExpired:
+            return f"System.Speech did not finish within {self.TIMEOUT_S:g} s"
+        if proc.returncode != 0:
+            return "System.Speech: " + (proc.stderr.decode("utf-8", "replace").strip()[-300:] or f"exit code {proc.returncode}")
+        return None if path.exists() and path.stat().st_size > 0 else "System.Speech produced an empty file"
+
     def synthesize(self, text: str, dest_stem: Path) -> Path:
+        text = text.strip()
+        if not text:
+            raise VoiceError("there is no text to read aloud")
         path = dest_stem.with_suffix(".sys.wav")
-        self._engine.save_to_file(text, str(path))
-        self._engine.runAndWait()
-        if not path.exists() or path.stat().st_size == 0:
-            raise VoiceError("the system voice produced no audio")
-        return path
+        path.unlink(missing_ok=True)
+        reasons = []
+        for attempt in (self._run_pyttsx3, self._run_powershell if sys.platform == "win32" else None):
+            if attempt is None:
+                continue
+            why = attempt(text, path)
+            if why is None:
+                return path
+            reasons.append(why)
+            path.unlink(missing_ok=True)
+        raise VoiceError("the system voice produced no audio (" + "; ".join(reasons) + "). "
+                         "Choose 'Edge neural voice' or 'Silent' instead.")
 
 
 class EdgeEngine:

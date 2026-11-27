@@ -264,3 +264,47 @@ def test_cli_make_previews_without_the_package_returns_2(dirs, monkeypatch, caps
     monkeypatch.setattr(tts, "is_available", lambda: False)
     assert cli.main(["--make-previews"]) == 2
     assert "no previews made" in capsys.readouterr().out
+
+
+# ------------------------------------------------------------------ narration: cleaning and the no-audio fallback
+def test_clean_text_removes_invisible_characters_and_keeps_vietnamese_letters():
+    import unicodedata
+    raw = unicodedata.normalize("NFD", "Hai yếu tố​ thường bổ trợ nhau﻿, “thay vì” đối lập…")
+    out = tts.clean_text(raw)
+    assert out == 'Hai yếu tố thường bổ trợ nhau, "thay vì" đối lập...'
+    assert unicodedata.is_normalized("NFC", out)
+
+
+def test_split_pieces_cuts_at_punctuation_and_joins_short_pieces():
+    s = "Hai yếu tố thường bổ trợ nhau, thay vì đối lập như hai con đường hoàn toàn tách biệt."
+    assert tts.split_pieces(s) == ["Hai yếu tố thường bổ trợ nhau,", "thay vì đối lập như hai con đường hoàn toàn tách biệt."]
+    assert tts.split_pieces("Ồ, vậy à, hay quá.") == ["Ồ, vậy à, hay quá."]
+
+
+class NoAudioReceived(Exception):
+    pass
+
+
+def test_save_speech_splits_the_text_when_the_service_sends_no_audio(fake, tmp_path):
+    whole = "Hai yếu tố thường bổ trợ nhau, thay vì đối lập như hai con đường hoàn toàn tách biệt."
+    original = fake.Communicate.save
+
+    async def save(self, path):
+        if self.text == whole:
+            fake.calls.append((self.text, self.voice, self.rate))
+            raise NoAudioReceived("No audio was received.")
+        await original(self, path)
+
+    fake.Communicate.save = save
+    out = tts.save_speech(whole, "vi-VN-HoaiMyNeural", tmp_path / "n.mp3")
+    assert out.read_bytes() == AUDIO * 2
+    texts = [c[0] for c in fake.calls]
+    assert texts.count(whole) == tts.RETRY_ATTEMPTS and len(texts) == tts.RETRY_ATTEMPTS + 2
+    assert not list(tmp_path.glob("*.part")) and not list(tmp_path.glob("*.tmp"))
+
+
+def test_save_speech_does_not_split_on_network_errors(fake, tmp_path):
+    fake.behaviour = "raise"
+    with pytest.raises(tts.TTSUnavailable, match="ConnectionError"):
+        tts.save_speech("Một câu, rồi một câu nữa thật dài để đọc.", "vi-VN-HoaiMyNeural", tmp_path / "n.mp3")
+    assert len(fake.calls) == tts.RETRY_ATTEMPTS

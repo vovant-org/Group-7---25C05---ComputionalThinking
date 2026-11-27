@@ -23,7 +23,9 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import importlib.util
+import re
 import threading
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -42,6 +44,50 @@ TIMEOUT_S = 25.0                                 # report R7: a timeout, then a 
 
 class TTSUnavailable(RuntimeError):
     """The TTS engine cannot be used right now (package missing, offline, service error)."""
+
+
+# ------------------------------------------------------------------ text sent to the service
+# Text written by an AI (REASON step, AI reader) or pasted from the web can carry characters that are
+# invisible on screen but make the service close the stream without audio ("NoAudioReceived"):
+# zero-width spaces, soft hyphens, byte-order marks, control characters, decomposed (NFD) Vietnamese
+# diacritics. They are removed or normalised before every request.
+_INVISIBLE = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff\u00ad\u200e\u200f"), None)
+_TYPOGRAPHY = str.maketrans({"\u201c": '"', "\u201d": '"', "\u201e": '"', "\u2018": "'", "\u2019": "'",
+                             "\u2013": "-", "\u2014": "-", "\u2026": "...", "\u00ab": '"', "\u00bb": '"'})
+_SPACES = re.compile(r"\s+")
+_PIECE_END = re.compile(r"(?<=[,;:.!?])\s+")
+MIN_PIECE_WORDS = 3                              # shorter pieces are joined to their neighbour
+
+
+def clean_text(text: str) -> str:
+    """The narration as it is sent to edge-tts: NFC, no invisible or control characters, plain
+    quotes and dashes, single spaces. Letters (and Vietnamese diacritics) are never changed."""
+    text = unicodedata.normalize("NFC", text or "").translate(_INVISIBLE).translate(_TYPOGRAPHY)
+    text = "".join(" " if unicodedata.category(ch).startswith("C") else ch for ch in text)
+    return _SPACES.sub(" ", text).strip()
+
+
+def split_pieces(text: str) -> list[str]:
+    """Split a sentence at its punctuation (, ; : . ! ?) into pieces of at least MIN_PIECE_WORDS words.
+    Used only as a fallback when the service returns no audio for the whole text."""
+    pieces: list[str] = []
+    for part in (p.strip() for p in _PIECE_END.split(text)):
+        if not part:
+            continue
+        if pieces and (len(part.split()) < MIN_PIECE_WORDS or len(pieces[-1].split()) < MIN_PIECE_WORDS):
+            pieces[-1] = f"{pieces[-1]} {part}"
+        else:
+            pieces.append(part)
+    return pieces
+
+
+def _is_no_audio(exc: BaseException) -> bool:
+    """True when the service answered but sent no audio (as opposed to: offline, timeout)."""
+    while exc is not None:
+        if type(exc).__name__ == "NoAudioReceived" or "returned no audio" in str(exc):
+            return True
+        exc = exc.__cause__
+    return False
 
 
 @dataclass(frozen=True)
@@ -122,6 +168,58 @@ def run_with_retry(make_coro, attempts: Optional[int] = None, pause_s: Optional[
             if i == attempts - 1:
                 raise
             time.sleep(pause_s * (i + 1))
+
+
+def save_speech(text: str, engine_voice: str, path: Path, speed: float = 1.0, pitch_hz: int = 0) -> Path:
+    """Synthesise `text` with the edge-tts voice `engine_voice` into the mp3 file `path`.
+
+    1. The text is cleaned (`clean_text`) and sent in one request, with retries.
+    2. When the service still sends NO AUDIO for it (NoAudioReceived), the text is split at its
+       punctuation (`split_pieces`) and every piece is synthesised on its own; the mp3 pieces are
+       joined (mp3 frames can be concatenated; FFmpeg decodes the result). Network failures and
+       timeouts are not retried this way: they would fail the same for every piece.
+    Raises TTSUnavailable with the piece that failed."""
+    edge_tts = _require_package()
+    text = clean_text(text)
+    if not text:
+        raise TTSUnavailable("there is no text to read aloud")
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    opts = tts_options(speed, pitch_hz)
+
+    def one(piece: str, target: Path, attempts: Optional[int] = None) -> bytes:
+        part = target.with_suffix(".part")
+
+        async def save():
+            await edge_tts.Communicate(piece, engine_voice, **opts).save(str(part))
+
+        try:
+            run_with_retry(save, attempts=attempts)
+            data = part.read_bytes() if part.exists() else b""
+            if not data:
+                raise TTSUnavailable("the TTS service returned no audio")
+            return data
+        finally:
+            part.unlink(missing_ok=True)
+
+    try:
+        data = one(text, path)
+    except TTSUnavailable as exc:
+        pieces = split_pieces(text)
+        if not _is_no_audio(exc) or len(pieces) < 2:
+            raise
+        chunks = []
+        for i, piece in enumerate(pieces):
+            try:
+                chunks.append(one(piece, path.with_name(f"{path.stem}.p{i}{path.suffix}"), attempts=2))
+            except TTSUnavailable as piece_exc:
+                raise TTSUnavailable(f"{exc} Splitting the text did not help either: no audio for the piece "
+                                     f"{piece!r} ({piece_exc}).") from piece_exc
+        data = b"".join(chunks)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_bytes(data)
+    tmp.replace(path)                            # only a complete file ever gets the final name
+    return path
 
 
 def synthesize_preview(voice: VoiceProfile, speed: float = 1.0, text: Optional[str] = None,

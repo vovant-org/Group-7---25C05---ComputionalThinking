@@ -1,4 +1,4 @@
 pytest
 streamlit>=1.31   # the workspace UI uses st.container(border=True) and a custom dark theme (.streamlit/config.toml)
 pandas
-edge-tts   # optional: only for the 'Hear this voice' preview; the app runs without it
+edge-tts>=7.0   # optional: only for the 'Hear this voice' preview; the app runs without it

@@ -182,9 +182,9 @@ class EdgeEngine:
     """A voice of the voice library through `edge-tts`. ONLINE: sends the narration text."""
     normalised = False
 
-    def __init__(self, voice: VoiceProfile, speed: float = 1.0):
-        self.voice, self.speed = voice, speed
-        self.name = f"edge-{voice.engine_voice}-{edge.rate_string(speed)}"
+    def __init__(self, voice: VoiceProfile, speed: float = 1.0, pitch_hz: int = 0):
+        self.voice, self.speed, self.pitch_hz = voice, speed, int(pitch_hz)
+        self.name = f"edge-{voice.engine_voice}-{edge.rate_string(speed)}" + (f"-{edge.pitch_string(pitch_hz)}" if self.pitch_hz else "")
 
     def synthesize(self, text: str, dest_stem: Path) -> Path:
         mod = edge._require_package()
@@ -192,10 +192,10 @@ class EdgeEngine:
         if not text:
             raise edge.TTSUnavailable("there is no text to read aloud")
         path = dest_stem.with_suffix(".mp3")
-        rate = edge.rate_string(self.speed)
+        opts = edge.tts_options(self.speed, self.pitch_hz)
 
         async def save():
-            await mod.Communicate(text, self.voice.engine_voice, rate=rate).save(str(path))
+            await mod.Communicate(text, self.voice.engine_voice, **opts).save(str(path))
 
         try:
             edge.run_with_retry(save)
@@ -279,11 +279,12 @@ def build_audio_track(entries, recorder: VoiceRecorder, out_wav: Path, total_s: 
 
 
 def make_engine(kind: str, voice: Optional[VoiceProfile] = None, speed: float = 1.0,
-                allow_online: bool = False, planning_wpm: float = 165.0) -> SpeechEngine:
+                allow_online: bool = False, planning_wpm: float = 165.0, pitch_hz: int = 0) -> SpeechEngine:
     """kind: "silent" | "system" | "edge" | "auto" (system voice when pyttsx3 exists, else silent).
 
     Privacy (report R7 / AI tool policy): "edge" sends the narration text to an online service, so it
-    is refused unless `allow_online` is set explicitly. "auto" never goes online."""
+    is refused unless `allow_online` is set explicitly. "auto" never goes online.
+    `pitch_hz` (voice casting, modules/voice_library/casting.py) only changes the Edge voices."""
     if kind == "silent":
         return SilentEngine(wpm=planning_wpm)
     if kind == "system":
@@ -296,7 +297,7 @@ def make_engine(kind: str, voice: Optional[VoiceProfile] = None, speed: float = 
             raise VoiceError("the 'edge' engine needs a voice from the voice library")
         if not edge.is_available():
             raise edge.TTSUnavailable("the 'edge-tts' package is not installed: pip install edge-tts")
-        return EdgeEngine(voice, speed)
+        return EdgeEngine(voice, speed, pitch_hz)
     if kind == "auto":
         try:
             return make_engine("system", voice, speed)

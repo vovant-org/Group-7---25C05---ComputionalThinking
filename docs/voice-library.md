@@ -21,6 +21,30 @@ Two audio sources, in this order:
 Without either, the sidebar tells the user what to do. The samples are the fixed public sentences in
 `SAMPLE_TEXT` (one English, one Vietnamese); user text is never sent.
 
+## Automatic language and voice casting (New Project → step 3 "Voice")
+- **Language** is detected from the question + material (`modules/voice_library/language.py`): Vietnamese letters /
+  tone marks, and now also Vietnamese typed **without** tone marks ("tai sao gia ca tang"). Step 3 shows only the
+  voices of that language.
+- **Voice casting** (`modules/voice_library/casting.py`): the topic analysis of the visual engine (domain, audience)
+  plus a few tone cue words choose a mood, and the mood chooses voice, speaking speed and pitch:
+
+| mood | when | voice (en / vi) | speed | pitch |
+|---|---|---|---|---|
+| calm | sleep, health, "relax", "stress" | Sonia / Hoài My | 0.90x | -2 Hz |
+| serious | economy, weather/flood, "crisis", "history" | Christopher / Nam Minh | 0.95x | -3 Hz |
+| energetic | technology, space, "sport", "future" | Guy / Nam Minh | 1.10x | +2 Hz |
+| warm | children, "story", "family", "friendly" | Jenny / Hoài My | 0.95x | +3 Hz |
+| curious | nature, students | Aria / Hoài My | 1.00x | +1 Hz |
+| neutral | anything else / no topic yet | default voice | 1.00x | 0 Hz |
+
+  The toggle **Auto-match the voice to my topic** (on by default) re-applies the proposal whenever the topic or
+  language changes. Picking a voice by hand turns it off; **Use the suggested voice** turns it back on. Pitch is
+  sent to edge-tts only (`pitch="+2Hz"`), so the offline system voice ignores it; at pitch 0 engine names, preview
+  cache files and project ids are identical to before. Offline and deterministic: no text is sent anywhere.
+  When the topic analysis cannot decide the subject ("Lạm phát hoạt động ra sao?"), a short list of subject words in
+  `casting.py` (`_DOMAIN_HINTS`: inflation/lạm phát, chứng khoán, công nghệ, sức khỏe...) fills it in, for the voice only.
+  ASSUMPTION: the mood table is our own judgement, not tested with listeners.
+
 ## Built-in voices
 | id | name | locale | gender |
 |---|---|---|---|

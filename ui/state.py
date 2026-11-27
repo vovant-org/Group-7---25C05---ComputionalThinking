@@ -17,6 +17,7 @@ DEFAULTS: dict[str, Any] = {
     "source": "text", "pack": "sleep", "language": "en", "fmt": "INFOGRAPHIC", "duration": 90, "auto_budget": True, "budget": 100,
     "speed": 1.0, "engine": None, "allow_online": False, "subtitles": "burn", "topic_aware": True,
     "ai_read": "off", "ai_image": "off", "ai_online": False, "ai_folder": "",
+    "auto_voice": True, "pitch": 0, "cast_applied": None, "voice_mood": "",   # voice casting: voice/speed/pitch follow the topic
     "voice_en": None, "voice_vi": None, "project": None, "sel_scene": None, "board_view": "Cards",
     "job": None, "gen_state": "idle", "last_outcome": None, "project_filter": "All formats", "preview": None,
 }

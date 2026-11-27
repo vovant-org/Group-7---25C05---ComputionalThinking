@@ -4,8 +4,10 @@
 
 Everything that is not one of these four answers has a sensible default and lives under
 "More options" on the last step: duration, subtitles, speaking speed, voice engine, topic-aware visuals,
-extra instructions. The language is not asked: it is detected from the content, and the voices offered
-are the ones that speak it. The content source is not asked either: material typed or uploaded by the
+extra instructions. The language is not asked: it is detected from the content (also Vietnamese typed without
+tone marks), and the voices offered are the ones that speak it. The voice itself is cast from the topic
+(modules/voice_library/casting.py): a calm voice for sleep, an authoritative one for economics, a lively one for
+technology... together with a matching speaking speed and pitch. The user can switch this off and pick any voice. The content source is not asked either: material typed or uploaded by the
 user is used; otherwise a ready-made demo can be picked (the REASON step is not built yet, so a topic
 alone cannot be researched).
 """
@@ -56,7 +58,33 @@ def _pick(key: str, value) -> None:
 
 
 def _pick_voice(language: str, voice_id: str) -> None:
-    st.session_state[f"voice_{language}"] = voice_id
+    """A voice picked by hand: the automatic casting stops overriding it (pitch back to the voice's own)."""
+    ss = st.session_state
+    ss[f"voice_{language}"] = voice_id
+    S.put("auto_voice", False)
+    S.put("pitch", 0)
+    ss["voice_mood"] = ""
+
+
+def _apply_cast(language: str, cast) -> None:
+    ss = st.session_state
+    ss[f"voice_{language}"] = cast.voice_id
+    S.put("speed", cast.speed)
+    S.put("pitch", cast.pitch_hz)
+    ss["voice_mood"] = cast.mood
+    ss["cast_applied"] = (language,) + cast.key
+
+
+def _use_suggested(language: str, cast) -> None:
+    S.put("auto_voice", True)
+    _apply_cast(language, cast)
+
+
+def _on_auto_voice() -> None:
+    S.sync("auto_voice")
+    st.session_state["cast_applied"] = None              # switched on again: re-apply the suggestion on the next run
+    if not st.session_state["auto_voice"]:
+        st.session_state["voice_mood"] = ""
 
 
 def _on_upload() -> None:
@@ -90,7 +118,8 @@ def _start() -> None:
         budget=None if ss["auto_budget"] else int(ss["budget"]), voice_id=ss[f"voice_{lang}"], speed=float(ss["speed"]),
         engine_kind=ss["engine"], allow_online=bool(ss["allow_online"]), subtitles=ss["subtitles"],
         topic_aware=bool(ss["topic_aware"]), language=lang, quality=ss["quality"],
-        ai_read=ss["ai_read"], ai_image=ss["ai_image"], ai_online=bool(ss["ai_online"]), ai_folder=ss["ai_folder"].strip())
+        ai_read=ss["ai_read"], ai_image=ss["ai_image"], ai_online=bool(ss["ai_online"]), ai_folder=ss["ai_folder"].strip(),
+        pitch_hz=int(ss["pitch"]) if ss["engine"] == "edge" else 0, voice_mood=ss["voice_mood"] if ss["auto_voice"] else "")
     ss["gen_state"] = "running"
     ss["last_outcome"] = None
     ss["view"] = "generate"
@@ -119,7 +148,12 @@ def _setup() -> dict:
     for L in languages:
         if ss.get(f"voice_{L}") not in [v.voice_id for v in lib.list(language=L)]:
             ss[f"voice_{L}"] = lib.default(L).voice_id
-    return {"lib": lib, "lib_error": lib_error, "claims": claims, "ctexts": [c.text for c in claims], "detected": detected}
+    ctexts = [c.text for c in claims]
+    texts = ctexts or ([ss["reference"]] if ss["source"] == "text" and ss["reference"].strip() else [])
+    cast = runner.cast_voice(lib, ss["language"], ss["topic"], texts, ss["instructions"])
+    if ss["auto_voice"] and ss["cast_applied"] != (ss["language"],) + cast.key:
+        _apply_cast(ss["language"], cast)                # the topic (or language) changed: follow it
+    return {"lib": lib, "lib_error": lib_error, "claims": claims, "ctexts": ctexts, "detected": detected, "cast": cast}
 
 
 def _validate(ctx: dict, *, final: bool) -> list[dict]:
@@ -205,20 +239,35 @@ def _step_format(ctx: dict) -> None:
 
 def _step_voice(ctx: dict) -> None:
     ss = st.session_state
-    lang, lib = ss["language"], ctx["lib"]
-    html(C.heading("Pick a voice", f"Narration language: {LANGUAGES[lang]} (matched to your content)."))
+    lang, lib, cast = ss["language"], ctx["lib"], ctx["cast"]
+    how = "detected from your content" if ctx["detected"] else "no text to detect yet"
+    html(C.heading("Pick a voice", f"Narration language: {LANGUAGES[lang]} ({how}). Only voices that speak it are shown."))
     if ctx["lib_error"]:
         html(C.alert("err", "Voice library file not loaded", f"Built-in voices only. {ctx['lib_error']}"))
+    st.toggle("Auto-match the voice to my topic", key=S.seed("auto_voice"), on_change=_on_auto_voice,
+              help="On: the app reads your question and material and picks the voice, speaking speed and pitch that suit "
+                   "the subject (calm for sleep, authoritative for economics, lively for technology...). Picking a voice "
+                   "below switches this off. Offline: nothing is sent anywhere.")
+    suggested = lib.get(cast.voice_id)
+    tune = f"Speed {cast.speed:.2f}x" + (f", pitch {cast.pitch_hz:+d} Hz (Edge voices)" if cast.pitch_hz else "")
+    if ss["auto_voice"]:
+        html(C.alert("ok", f"Voice for this topic: {suggested.name} · {cast.label}", f"{cast.reason} {tune}."))
+    else:
+        html(C.alert("info", f"Suggested for this topic: {suggested.name} · {cast.label}", f"{cast.reason} {tune}."))
+        btn("Use the suggested voice", icon="auto_awesome", key="use_cast", on_click=_use_suggested, args=(lang, cast))
     voices, current = lib.list(language=lang), ss[f"voice_{lang}"]
+    pitch = int(ss["pitch"])
     for row in range(0, len(voices), 2):
         for col, v in zip(st.columns(2, gap="large"), voices[row:row + 2]):
             with col:
                 traits = [v.gender.title(), v.locale]
-                card_button(C.voice_card(v.name, LANGUAGES[v.language], traits, selected=v.voice_id == current, note=v.notes),
+                note = " · ".join(n for n in ["★ Best match for this topic" if v.voice_id == cast.voice_id else "", v.notes] if n)
+                card_button(C.voice_card(v.name, LANGUAGES[v.language], traits, selected=v.voice_id == current, note=note),
                             "Selected" if v.voice_id == current else "Select", key=f"voice_{v.voice_id}", selected=v.voice_id == current,
                             on_click=_pick_voice, args=(lang, v.voice_id))
-                if runner.preview_available(v, float(ss["speed"])) and st.button("▶ Preview", key=f"prev_{v.voice_id}"):
-                    audio, err = runner.preview_audio(v, float(ss["speed"]))
+                vp = pitch if v.voice_id == current and runner.preview_available(v, float(ss["speed"]), pitch) else 0
+                if runner.preview_available(v, float(ss["speed"]), vp) and st.button("▶ Preview", key=f"prev_{v.voice_id}"):
+                    audio, err = runner.preview_audio(v, float(ss["speed"]), vp)
                     ss["preview"] = (v.voice_id, audio, err)
     if ss["preview"] and ss["preview"][0] in [v.voice_id for v in voices]:
         _, audio, err = ss["preview"]
@@ -256,6 +305,8 @@ def _step_budget(ctx: dict) -> None:
         if ss["engine"] == "system" and not runner.system_voice_installed():
             html(C.alert("warn", "pyttsx3 is not installed", "Run  pip install pyttsx3  or choose another engine."))
         if ss["engine"] == "edge":
+            st.slider("Voice pitch (Hz)", -10, 10, key=S.seed("pitch"), on_change=S.sync, args=("pitch",), step=1,
+                      help="0 = the voice's own pitch. Set automatically when “Auto-match the voice to my topic” is on.")
             if not runner.edge_installed():
                 html(C.alert("warn", "edge-tts is not installed", "Run  pip install edge-tts  or choose another engine."))
             st.checkbox("I understand the narration text is sent to an online service", key=S.seed("allow_online"), on_change=S.sync,
@@ -292,7 +343,8 @@ def _step_budget(ctx: dict) -> None:
                "blocking": False, "messages": ["The cost is planned after the AI has written the claims."]}
     html(C.section("Your video"))
     voice = ctx["lib"].get(ss[f"voice_{lang}"])
-    html(C.badges([(short_title(ss["topic"], 48) or "—", "accent"), (ss["fmt"].title(), "info"), (voice.name, "neutral"),
+    mood = ctx["cast"].label if ss["auto_voice"] else "Voice picked by you"
+    html(C.badges([(short_title(ss["topic"], 48) or "—", "accent"), (ss["fmt"].title(), "info"), (voice.name, "neutral"), (mood, "neutral"),
                    (f"{int(ss['duration'])} s", "neutral"), (runner.QUALITY_LABELS[ss["quality"]], "neutral")]))
     html(C.budget_card(est))
     _alerts(msgs)

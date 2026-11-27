@@ -59,9 +59,23 @@ def rate_string(speed: float) -> str:
     return f"{round((check_speed(speed) - 1.0) * 100):+d}%"
 
 
-def preview_path(voice: VoiceProfile, text: str, speed: float = 1.0, out_dir: Optional[Path] = None) -> Path:
-    """Deterministic cache file name: the same voice, text and speed always map to the same file."""
-    key = f"{voice.engine_voice}|{rate_string(speed)}|{text}"
+def pitch_string(pitch_hz: int = 0) -> str:
+    """edge-tts pitch offset: 0 -> '+0Hz', -3 -> '-3Hz' (chosen by modules/voice_library/casting.py)."""
+    return f"{int(pitch_hz):+d}Hz"
+
+
+def tts_options(speed: float = 1.0, pitch_hz: int = 0) -> dict:
+    """Keyword arguments for edge_tts.Communicate. `pitch` is only passed when it changes the voice."""
+    opts = {"rate": rate_string(speed)}
+    if int(pitch_hz):
+        opts["pitch"] = pitch_string(pitch_hz)
+    return opts
+
+
+def preview_path(voice: VoiceProfile, text: str, speed: float = 1.0, out_dir: Optional[Path] = None,
+                 pitch_hz: int = 0) -> Path:
+    """Deterministic cache file name: the same voice, text, speed and pitch always map to the same file."""
+    key = f"{voice.engine_voice}|{rate_string(speed)}|{text}" + (f"|{pitch_string(pitch_hz)}" if int(pitch_hz) else "")
     return Path(out_dir or PREVIEW_DIR) / f"{voice.voice_id}-{hashlib.sha1(key.encode('utf-8')).hexdigest()[:10]}.mp3"
 
 
@@ -111,12 +125,12 @@ def run_with_retry(make_coro, attempts: Optional[int] = None, pause_s: Optional[
 
 
 def synthesize_preview(voice: VoiceProfile, speed: float = 1.0, text: Optional[str] = None,
-                       out_dir: Optional[Path] = None) -> Path:
+                       out_dir: Optional[Path] = None, pitch_hz: int = 0) -> Path:
     """Audio file (mp3) of `voice` reading a sample sentence. Cached: a repeat call is free."""
     if voice.engine != ENGINE_EDGE:
         raise ValueError(f"voice {voice.voice_id} uses engine {voice.engine!r}, not {ENGINE_EDGE!r}")
     text = text if text is not None else SAMPLE_TEXT[voice.language]
-    path = preview_path(voice, text, speed, out_dir)
+    path = preview_path(voice, text, speed, out_dir, pitch_hz)
     if path.exists() and path.stat().st_size > 0:
         return path
     edge_tts = _require_package()
@@ -124,7 +138,7 @@ def synthesize_preview(voice: VoiceProfile, speed: float = 1.0, text: Optional[s
     part = path.with_suffix(".part")
 
     async def save():
-        await edge_tts.Communicate(text, voice.engine_voice, rate=rate_string(speed)).save(str(part))
+        await edge_tts.Communicate(text, voice.engine_voice, **tts_options(speed, pitch_hz)).save(str(part))
 
     try:
         run_with_retry(save)
@@ -164,19 +178,19 @@ def has_bundled(voice: VoiceProfile, bundled_dir: Optional[Path] = None) -> bool
     return p.exists() and p.stat().st_size > 0
 
 
-def can_preview(voice: VoiceProfile, speed: float = 1.0, bundled_dir: Optional[Path] = None) -> bool:
-    """True when `get_preview` has a chance: a bundled sample at normal speed, or the live engine."""
-    return (speed == 1.0 and has_bundled(voice, bundled_dir)) or (voice.engine == ENGINE_EDGE and is_available())
+def can_preview(voice: VoiceProfile, speed: float = 1.0, bundled_dir: Optional[Path] = None, pitch_hz: int = 0) -> bool:
+    """True when `get_preview` has a chance: a bundled sample at normal speed and pitch, or the live engine."""
+    return (speed == 1.0 and not int(pitch_hz) and has_bundled(voice, bundled_dir)) or (voice.engine == ENGINE_EDGE and is_available())
 
 
 def get_preview(voice: VoiceProfile, speed: float = 1.0, bundled_dir: Optional[Path] = None,
-                out_dir: Optional[Path] = None) -> Path:
-    """Audio file to play for `voice`: the bundled sample at normal speed, otherwise live synthesis.
+                out_dir: Optional[Path] = None, pitch_hz: int = 0) -> Path:
+    """Audio file to play for `voice`: the bundled sample at normal speed and pitch, otherwise live synthesis.
     Raises TTSUnavailable when neither is possible."""
     check_speed(speed)
-    if speed == 1.0 and has_bundled(voice, bundled_dir):
+    if speed == 1.0 and not int(pitch_hz) and has_bundled(voice, bundled_dir):
         return bundled_path(voice, bundled_dir)
-    return synthesize_preview(voice, speed, out_dir=out_dir)
+    return synthesize_preview(voice, speed, out_dir=out_dir, pitch_hz=pitch_hz)
 
 
 def make_bundled_previews(lib: VoiceLibrary, bundled_dir: Optional[Path] = None, force: bool = False,

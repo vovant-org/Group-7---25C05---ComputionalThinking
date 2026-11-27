@@ -107,22 +107,28 @@ def request_text(topic: str, instructions: str) -> str:
 
 
 # ------------------------------------------------------------------------------------------- preview
-def preview_available(voice, speed: float) -> bool:
+def preview_available(voice, speed: float, pitch_hz: int = 0) -> bool:
     """True only when the existing preview functionality can play this voice (bundled sample or edge-tts)."""
     try:
-        return tts_engine.can_preview(voice, speed)
+        return tts_engine.can_preview(voice, speed, pitch_hz=pitch_hz)
     except Exception:
         return False
 
 
-def preview_audio(voice, speed: float) -> tuple[Optional[bytes], str]:
+def preview_audio(voice, speed: float, pitch_hz: int = 0) -> tuple[Optional[bytes], str]:
     """(audio bytes, "") or (None, reason). Uses only the fixed public sample sentence, never user text."""
     try:
-        return tts_engine.get_preview(voice, speed).read_bytes(), ""
+        return tts_engine.get_preview(voice, speed, pitch_hz=pitch_hz).read_bytes(), ""
     except tts_engine.TTSUnavailable as exc:
         return None, str(exc)
     except Exception as exc:                                    # a preview must never take the page down
         return None, f"Preview failed: {exc}"
+
+
+def cast_voice(lib: VoiceLibrary, language: str, topic: str, texts: list, instructions: str = ""):
+    """Voice, speed and pitch proposed for this topic (modules/voice_library/casting.py). Offline and instant."""
+    from modules.voice_library.casting import cast_voice as _cast
+    return _cast(lib, language, topic, list(texts), instructions)
 
 
 # ------------------------------------------------------------------------------------------ estimate
@@ -163,6 +169,8 @@ class GenParams:
     ai_image: str = "off"                  # off | pollinations | folder: an AI picture of each claim (INFOGRAPHIC only)
     ai_online: bool = False                # the user confirmed that text is sent to an online AI service
     ai_folder: str = ""                    # folder of hand-made pictures for ai_image == "folder"
+    pitch_hz: int = 0                      # voice pitch offset (Edge voices only), proposed by voice casting
+    voice_mood: str = ""                   # mood chosen by voice casting ("" = the user picked the voice)
 
 
 @dataclass
@@ -186,7 +194,8 @@ def _record(p: GenParams, pid: str, voice, engine_name: str, res, facts: dict, n
         "request_text": request_text(p.topic, p.instructions), "instructions": p.instructions,
         "content_source": p.source, "pack": p.pack, "language": p.language,
         "voice": {"id": voice.voice_id, "name": voice.name, "speed": f"×{p.speed:g}", "engine": engine_label(p.engine_kind),
-                  "engine_id": engine_name},
+                  "engine_id": engine_name,
+                  **({"pitch": f"{p.pitch_hz:+d} Hz"} if p.pitch_hz else {}), **({"mood": p.voice_mood} if p.voice_mood else {})},
         "requested": {"format": p.fmt, "t_target": p.t_target, "budget": p.budget},
         "options": {"subtitles": p.subtitles, "topic_aware": p.topic_aware, "quality": p.quality,
                     **({"ai_read": p.ai_read, "ai_image": p.ai_image} if (p.ai_read, p.ai_image) != ("off", "off") else {})},
@@ -207,7 +216,7 @@ def generate(p: GenParams, progress: Optional[Callable[[float, str], None]] = No
     lib, _ = load_voices()
     voice = lib.get(p.voice_id)
     try:
-        engine = make_engine(p.engine_kind, voice, p.speed, p.allow_online, voice.planning_wpm(p.speed))
+        engine = make_engine(p.engine_kind, voice, p.speed, p.allow_online, voice.planning_wpm(p.speed), pitch_hz=p.pitch_hz)
     except Exception as exc:                                   # missing package, online not confirmed, ...
         return Outcome(False, error=f"Voice engine: {exc}")
     claims = build_claims(p.source, p.pack, p.reference)

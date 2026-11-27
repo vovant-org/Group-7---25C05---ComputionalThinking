@@ -85,7 +85,7 @@ def subject_mask(rgb: Image.Image) -> Optional[Image.Image]:
     frac = float(subject.mean())
     if not MIN_SUBJECT <= frac <= MAX_SUBJECT:
         return None
-    mask = Image.fromarray((subject * 255).astype(np.uint8), "L")
+    mask = Image.fromarray((subject * 255).astype(np.uint8))
     mask = mask.filter(ImageFilter.MinFilter(3))                 # shave the white halo around the edge
     return mask.resize(rgb.size, Image.BILINEAR).filter(ImageFilter.GaussianBlur(1.0))
 
@@ -150,10 +150,16 @@ def _backdrop(st: Style, tone: tuple, facet: str, index: int, total: int, accent
     return img
 
 
-def _glow(tone: tuple) -> Image.Image:
-    img = Image.new("RGBA", (640, 640), (0, 0, 0, 0))
-    ImageDraw.Draw(img).ellipse((100, 100, 540, 540), fill=_mix(tone, WHITE, 0.45) + (150,))
-    return img.filter(ImageFilter.GaussianBlur(34))
+GLOW_SCALE_MAX = 1.1             # pop 1.05 + wiggle: the glow never grows past this
+
+
+def _glow(tone: tuple, rx: float, ry: float) -> Image.Image:
+    """Soft elliptical glow of size 2rx x 2ry; the visible part stays inside the sprite (4 sigma margin)."""
+    blur = max(5.0, ry * 0.08)
+    ex, ey = max(10.0, rx - 4 * blur), max(10.0, ry - 4 * blur)
+    img = Image.new("RGBA", (int(2 * rx), int(2 * ry)), (0, 0, 0, 0))
+    ImageDraw.Draw(img).ellipse((rx - ex, ry - ey, rx + ex, ry + ey), fill=_mix(tone, WHITE, 0.45) + (150,))
+    return img.filter(ImageFilter.GaussianBlur(blur))
 
 
 def _shadow() -> Image.Image:
@@ -174,14 +180,17 @@ def compose_ai_scene(scene: Scene, claim_text: str, art: Image.Image, st: Style 
     accent = st.accent(scene.facet)
     base = _backdrop(st, cut.tone, scene.facet, index, total, accent)
 
+    glow_ry = max(40.0, min(230.0, (SUB_TOP - 4 - cy) / GLOW_SCALE_MAX))   # stays above the subtitle band
+    glow_rx = min(420.0, w * 0.6 + 80)
+
     x_in = Track(((0.0, cx - 300 * s), (0.22, cx)))
     bob = Track(join(((0.0, cy),), wiggle(cy, 6.0 * e, 3, 0.22, 1.0, n=8)), ease=False)
     zoom = Track(join(pop(0.03, 0.22, 1.12), ((1.0, 1.045 + 0.02 * e),)))
     layers = [
-        Layer("glow", _glow(cut.tone), hold(cx), hold(cy),
+        Layer("glow", _glow(cut.tone, glow_rx, glow_ry), hold(cx), hold(cy),
               scale=Track(join(pop(0.02, 0.25, 1.05), wiggle(1.0, 0.04 * e, 3, 0.3, 1.0, n=8))),
               alpha=Track(fade(0.02, 0.15)), z=1),
-        Layer("shadow", _shadow(), x_in, hold(FLOOR_Y + 12), scale=hold(min(1.3, max(0.5, w / 440))),
+        Layer("shadow", _shadow(), x_in, hold(FLOOR_Y + 6), scale=hold(min(1.2, max(0.5, w / 440))),
               alpha=Track(fade(0.03, 0.14)), z=2),
         Layer("picture", sp, x_in, bob, scale=zoom, alpha=Track(fade(0.03, 0.12)), z=3),
     ]

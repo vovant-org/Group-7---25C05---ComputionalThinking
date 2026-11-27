@@ -115,9 +115,12 @@ def test_scenes_of_a_video_share_one_look_but_differ_in_tone():
 
 
 # ------------------------------------------------------------------ getting the pictures
+SUBJECTS = ["a moon over a hill", "a sun above the sea", "a star in the night sky",
+            "a tree in a field", "a cloud over a town", "a bird on a branch"]
+
 def scenes_and_visuals(n=4):
     sc = [scene(i) for i in range(n)]
-    return sc, {f"C{i}": "a moon" for i in range(n)}
+    return sc, {f"C{i}": SUBJECTS[i] for i in range(n)}
 
 
 def test_scenes_without_a_picture_are_retried_with_the_circuit_breaker_reopened(tmp_path):

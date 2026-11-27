@@ -1,4 +1,4 @@
-"""Video Studio: preview, timeline, storyboard and a read-only properties panel for one project.
+"""Video Studio: preview, a clickable timeline and a read-only properties panel for one project.
 
 Everything shown is read from the project's files (see ui/storage.py). There are no editing controls: the
 backend cannot edit a scene, so none is drawn.
@@ -7,19 +7,28 @@ from __future__ import annotations
 
 import html as _html
 import json
+import math
 
-import pandas as pd
 import streamlit as st
 
 from ui import components as C
 from ui import state as S
 from ui import storage
 from ui.adapters import stage_view, storyboard_scenes, timeline_data
-from ui.widgets import btn, card_button, html, stretch
+from ui.widgets import btn, html, stretch, timeline_video_row
 
-
-def _select(number: int) -> None:
+def _jump(number: int, start_s: float) -> None:
+    """Timeline click: select the scene (Properties panel) and move the preview to the scene's start."""
     st.session_state["sel_scene"] = number
+    st.session_state["studio_seek"] = (st.session_state.get("project"), start_s)
+
+
+def _start_time(project_id: str) -> int:
+    seek = st.session_state.get("studio_seek")
+    if not seek or seek[0] != project_id:                    # a jump made in another project does not carry over
+        return 0
+    # st.video seeks in whole seconds: round up so the preview lands inside the scene, not at the end of the previous one
+    return int(math.ceil(seek[1] - 1e-6))
 
 
 def _again() -> None:
@@ -71,11 +80,11 @@ def render() -> None:
         if proj["video_path"] is not None:
             html(C.badges([("Video rendered", "ok"), (str(rep.get("format", "")).title(), "accent"),
                            (f'{rep["total_s"]:.1f} s', "neutral"), ("Silent audio track" if silent else "Narrated", "warn" if silent else "ok")]))
-            st.video(str(proj["video_path"]))
+            st.video(str(proj["video_path"]), start_time=_start_time(proj["id"]))
         else:
             html(C.badges([("No video file", "warn"), (str(rep.get("format", "")).title(), "accent")]))
             html(C.storyboard_preview("Storyboard preview only", "The MP4 of this project is not in outputs/videos/ (it may have been moved or "
-                                      "deleted). The scenes and timeline below come from the saved report."))
+                                      "deleted). The timeline below comes from the saved report."))
         if silent:
             html(C.alert("warn", "This video has no sound", "It was made with the silent engine. Create it again with a system or Edge voice to hear the narration."))
         ai_img, ai_notes = rep.get("ai_images"), rep.get("ai_notes") or []
@@ -86,32 +95,13 @@ def render() -> None:
         if ai_notes:
             html(C.alert("info", "AI reader", _html.escape(" ".join(ai_notes)[:600])))
 
-        # ---- timeline
+        # ---- timeline (click a scene on the Video track to jump to it)
         html(C.section("Timeline"))
-        html(C.timeline_tracks(tl["video"], tl["audio"], tl["subtitles"], tl["total_s"], selected_scene=ss["sel_scene"], silent=silent,
-                               subtitles_note="No .srt file found for this project"))
-
-        # ---- storyboard
-        sb1, sb2 = st.columns([3, 1])
-        with sb1:
-            html(C.section("Storyboard"))
-        with sb2:
-            st.radio("View", ["Cards", "Table"], key=S.seed("board_view"), on_change=S.sync, args=("board_view",), horizontal=True,
-                     label_visibility="collapsed")
-        if ss["board_view"] == "Table":
-            rows = [{"#": s["number"], "Start (s)": round(s["start_s"], 1), "Length (s)": round(s["duration_s"], 1), "Mode": s["mode"],
-                     "Layout": s["layout"], "Narration": s["narration"], "Visual": s["visual"],
-                     "Claims": ", ".join(c["claim_id"] for c in s["claims"]) or "—"} for s in scenes]
-            st.dataframe(pd.DataFrame(rows), hide_index=True, **stretch(st.dataframe),
-                         column_config={"Narration": st.column_config.TextColumn(width="large"), "Visual": st.column_config.TextColumn(width="large")})
-        else:
-            per_row = 2
-            for i in range(0, len(scenes), per_row):
-                for col, s in zip(st.columns(per_row), scenes[i:i + per_row]):
-                    with col:
-                        card_button(C.scene_card(dict(s, scene=s["number"]), selected=s["number"] == ss["sel_scene"]),
-                                    "Inspect scene " + str(s["number"]), key=f"scene_{s['number']}", selected=s["number"] == ss["sel_scene"],
-                                    on_click=_select, args=(s["number"],))
+        with st.container(border=True):
+            timeline_video_row(tl["video"], tl["total_s"], ss["sel_scene"], on_click=_jump)
+            html(C.timeline_tracks(tl["video"], tl["audio"], tl["subtitles"], tl["total_s"], selected_scene=ss["sel_scene"], silent=silent,
+                                   subtitles_note="No .srt file found for this project", include_video=False, framed=False))
+        st.caption("Click a scene on the Video track to jump to it in the preview and see its details on the right.")
 
     with side:
         html(C.section("Properties"))

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 import streamlit as st
 
@@ -10,6 +10,7 @@ from ui import components as C
 from ui import state as S
 from ui import storage
 from ui.adapters import short_title
+from ui.theme import MODE_COLORS
 
 
 def _supports(func: Callable, name: str) -> bool:
@@ -51,6 +52,52 @@ def card_button(card_html: str, label: str, *, key: str, selected: bool = False,
     html(card_html)
     return btn(("✓ " if selected else "") + label, key=key, type="primary" if selected else "secondary",
                on_click=on_click, args=args, disabled=disabled, help=help)
+
+
+# The innermost columns block that holds the Video-row marker (outer layout columns also contain it, so they are excluded).
+_TLV = ('div[data-testid="stHorizontalBlock"]:has(.sf-tlv-mark)'
+        ':not(:has(div[data-testid="stHorizontalBlock"] .sf-tlv-mark))')
+
+
+def timeline_video_row(video: Sequence[dict], total_s: float, selected_scene: Optional[int],
+                       on_click: Callable, key_prefix: str = "tl_scene") -> None:
+    """The timeline's Video track drawn as one button per scene; clicking calls on_click(scene_number, start_s).
+
+    Each button's width follows the scene's real length, and idle time between clips is kept as an empty spacer, so the
+    row lines up with the Audio/Subtitles tracks drawn underneath by components.timeline_tracks(include_video=False)."""
+    if not video:
+        html(C.h('<div class="sf-tl-row">', C.timeline_label("Video", "video"),
+                 '<div class="sf-tl-track"><div class="sf-card-text" style="padding:.55rem .8rem;margin:0">No video clips</div></div></div>'))
+        return
+    total = max(total_s, max(c["end_s"] for c in video), 0.001)
+    clips = sorted(video, key=lambda c: c["start_s"])
+    spec, items, t = [total * 0.09], [], 0.0                  # first column: the "Video" label (fixed width in CSS)
+    for c in clips:
+        if c["start_s"] - t > 0.05:                           # a gap in the real timeline: keep it as empty space
+            spec.append(c["start_s"] - t)
+            items.append(None)
+        spec.append(max(c["end_s"] - c["start_s"], 0.05))
+        items.append(c)
+        t = max(t, c["end_s"])
+    if total - t > 0.05:
+        spec.append(total - t)
+        items.append(None)
+
+    # per-column colours (mode colour of each scene); nth-child counts the label column as 1
+    css = [f'{_TLV}>div:nth-child({i + 2}) button{{background:{MODE_COLORS.get(c["mode"], "#64748B")}!important}}'
+           for i, c in enumerate(items) if c is not None]
+    html("<style>" + "".join(css) + "</style>")
+    cols = st.columns(spec)
+    with cols[0]:
+        html(C.timeline_label("Video", "video", "sf-tlv-mark"))
+    for col, c in zip(cols[1:], items):
+        if c is None:
+            continue
+        with col:
+            sel = c["scene"] == selected_scene
+            btn(str(c["scene"]), key=f"{key_prefix}_{c['scene']}", type="primary" if sel else "secondary",
+                help="Scene %s: %.1f-%.1f s, %s. Click to jump to this scene." % (c["scene"], c["start_s"], c["end_s"], c["mode"]),
+                on_click=on_click, args=(c["scene"], float(c["start_s"])))
 
 
 def split_marker() -> None:

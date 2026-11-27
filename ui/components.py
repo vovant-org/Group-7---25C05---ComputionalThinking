@@ -260,9 +260,18 @@ def _ticks(total: float) -> str:
     return "".join(out)
 
 
+def timeline_label(label: str, ico: str, extra_class: str = "") -> str:
+    """The label at the left of one timeline row (also used by the clickable Video row in ui.widgets)."""
+    return f'<div class="sf-tl-label {extra_class}">{icon(ico, 15)}{esc(label)}</div>'
+
+
 def timeline_tracks(video: Sequence[dict], audio: Sequence[dict], subtitles: Sequence[dict], total_s: float,
-                    selected_scene: Optional[int] = None, silent: bool = False, subtitles_note: str = "") -> str:
-    """Three tracks on one time axis. Clips are positioned by their real start/end seconds."""
+                    selected_scene: Optional[int] = None, silent: bool = False, subtitles_note: str = "",
+                    include_video: bool = True, framed: bool = True) -> str:
+    """Three tracks on one time axis. Clips are positioned by their real start/end seconds.
+
+    include_video=False leaves out the Video row (the Studio draws it as clickable buttons, see ui.widgets.timeline_video_row);
+    framed=False drops the card frame so the rows can sit inside a bordered Streamlit container with those buttons."""
     total = max(total_s, max([c["end_s"] for c in video] + [0.0]), 0.001)
 
     def pos(c: dict) -> str:
@@ -287,9 +296,10 @@ def timeline_tracks(video: Sequence[dict], audio: Sequence[dict], subtitles: Seq
 
     def row(label: str, ico: str, clips: str, empty: str) -> str:
         body = clips or f'<div class="sf-card-text" style="padding:.55rem .8rem;margin:0">{esc(empty)}</div>'
-        return f'<div class="sf-tl-row"><div class="sf-tl-label">{icon(ico, 15)}{label}</div><div class="sf-tl-track">{body}</div></div>'
+        return f'<div class="sf-tl-row">{timeline_label(label, ico)}<div class="sf-tl-track">{body}</div></div>'
 
-    return h('<div class="sf-tl">', row("Video", "video", v, "No video clips"), row("Audio", "mic", a, "No audio clips"),
+    return h(f'<div class="sf-tl{"" if framed else " bare"}">', row("Video", "video", v, "No video clips") if include_video else "",
+             row("Audio", "mic", a, "No audio clips"),
              row("Subtitles", "subtitles", s, subtitles_note or "No subtitle cues"), f'<div class="sf-axis">{_ticks(total)}</div>',
              f'<div class="sf-legend">{legend}</div></div>')
 
@@ -298,7 +308,7 @@ def timeline_tracks(video: Sequence[dict], audio: Sequence[dict], subtitles: Seq
 def property_panel(scene: Optional[dict], voice: dict, evidence_note: str = "") -> str:
     """Details of the selected scene. Read-only: the backend has no scene editing, so no edit controls are drawn."""
     if scene is None:
-        return empty_state("No scene selected", "Select a scene in the storyboard to see its details.", "layout")
+        return empty_state("No scene selected", "Click a scene on the timeline's Video track to see its details.", "layout")
     claims = scene.get("claims") or []
     cl = "".join(f'<div class="sf-claim"><b>{esc(c["claim_id"])}</b><br>{esc(c.get("text") or "text not recorded")}</div>' for c in claims)
     if not cl:

@@ -162,6 +162,22 @@ section[data-testid="stSidebar"] .stButton>button[data-testid="stBaseButton-prim
 .sf-clip.sub{background:linear-gradient(180deg,#A78BFA,#7C3AED);color:#fff;font-weight:600}
 .sf-clip.sel{outline:2px solid #fff;outline-offset:-2px}
 .sf-clip.silent{background:repeating-linear-gradient(135deg,rgba(148,163,184,.25) 0 6px,rgba(148,163,184,.1) 6px 12px);color:var(--sf-soft)}
+.sf-tl.bare{background:none;border:none;padding:0;border-radius:0;margin-top:-.55rem}
+/* clickable Video row (ui.widgets.timeline_video_row): label column fixed like .sf-tl-label, scene buttons sized by length */
+div[data-testid="stHorizontalBlock"]:has(.sf-tlv-mark):not(:has(div[data-testid="stHorizontalBlock"] .sf-tlv-mark)){gap:0!important;
+  align-items:stretch;flex-wrap:nowrap!important;margin-bottom:0}
+div[data-testid="stHorizontalBlock"]:has(.sf-tlv-mark):not(:has(div[data-testid="stHorizontalBlock"] .sf-tlv-mark))>div{min-width:0!important;padding:0 1px}
+div[data-testid="stHorizontalBlock"]:has(.sf-tlv-mark):not(:has(div[data-testid="stHorizontalBlock"] .sf-tlv-mark))>div:first-child{
+  flex:0 0 calc(92px + .7rem)!important;width:calc(92px + .7rem)!important;max-width:calc(92px + .7rem)!important;padding:0}
+div[data-testid="stHorizontalBlock"]:has(.sf-tlv-mark):not(:has(div[data-testid="stHorizontalBlock"] .sf-tlv-mark)) .sf-tl-label{height:38px}
+div[data-testid="stHorizontalBlock"]:has(.sf-tlv-mark):not(:has(div[data-testid="stHorizontalBlock"] .sf-tlv-mark)) .stButton button{
+  min-height:38px;height:38px;padding:0 2px;border-radius:7px;border:none;color:#0B0D12!important;font-size:.72rem;font-weight:700;
+  cursor:pointer;transition:filter .15s ease,transform .15s ease}
+div[data-testid="stHorizontalBlock"]:has(.sf-tlv-mark):not(:has(div[data-testid="stHorizontalBlock"] .sf-tlv-mark)) .stButton button:hover{
+  filter:brightness(1.12);transform:translateY(-1px)}
+div[data-testid="stHorizontalBlock"]:has(.sf-tlv-mark):not(:has(div[data-testid="stHorizontalBlock"] .sf-tlv-mark)) .stButton button[kind="primary"],
+div[data-testid="stHorizontalBlock"]:has(.sf-tlv-mark):not(:has(div[data-testid="stHorizontalBlock"] .sf-tlv-mark)) .stButton button[data-testid="stBaseButton-primary"]{
+  box-shadow:inset 0 0 0 2px #fff,0 0 0 1px rgba(255,255,255,.35)!important}
 .sf-axis{position:relative;height:18px;margin-left:calc(92px + .7rem)}
 .sf-axis span{position:absolute;transform:translateX(-50%);font-size:.68rem;color:var(--sf-muted)}
 .sf-legend{display:flex;flex-wrap:wrap;gap:.9rem;margin-top:.7rem;font-size:.76rem;color:var(--sf-muted)}
@@ -228,6 +244,8 @@ div[data-testid="stVerticalBlockBorderWrapper"]{border-color:var(--sf-border)!im
 }
 @media (max-width:760px){
   .sf-tl-label{width:60px}.sf-axis{margin-left:calc(60px + .7rem)}
+  div[data-testid="stHorizontalBlock"]:has(.sf-tlv-mark):not(:has(div[data-testid="stHorizontalBlock"] .sf-tlv-mark))>div:first-child{
+    flex:0 0 calc(60px + .7rem)!important;width:calc(60px + .7rem)!important;max-width:calc(60px + .7rem)!important}
 }
 
 /* ---------- step-by-step flow ---------- */

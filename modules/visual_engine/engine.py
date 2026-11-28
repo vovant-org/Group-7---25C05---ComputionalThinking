@@ -175,7 +175,8 @@ class TopicScene:
             s = -1 if self.mirror else 1
             stage = Stage(fx=st.size[0] - 300 if self.mirror else 300, cx=(x0 + x1) / 2, s=s, gy=GROUND_Y,
                           accent=self.accent, accent2=self.accent2, energy=self.plan.energy)
-            layers += character_layers(stage, self.plan.pose)
+            layers += character_layers(stage, self.plan.pose, role=self.plan.role, narration=self.narration,
+                                       audio_s=min(audio_s, duration_s))
         layers.sort(key=lambda l: l.z)
         self._built[key] = layers
         return layers

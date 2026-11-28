@@ -33,7 +33,7 @@ SYNC_TOL_S = 0.5
 CUE_MIN_S, CUE_MAX_S = 0.5, 8.0
 AUDIBLE_DB = -50.0
 ROUND_S = 2e-3                                 # cue times are rounded to 1 ms
-FIGURE_PARTS = frozenset({"arm_back", "body", "head", "arm_front"})
+FIGURE_PARTS = frozenset({"arm_back", "body", "head", "arm_front", "stickman"})   # stickman: the jointed figure
 
 
 @dataclass

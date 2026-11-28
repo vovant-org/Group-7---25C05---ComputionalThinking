@@ -52,3 +52,24 @@ background was removed cleanly, share of videos that fall back, render time per 
 Known limits: the cut-out assumes a plain background (the style prompt asks for it; FLUX schnell does not always obey);
 FLUX schnell takes no seed, so consistency between scenes comes from the shared prompt only; the subject itself does not
 move (the whole picture slides, floats and zooms), which is a limit of one still image per scene.
+
+## D. Jointed stick figure (design note, NOT yet measured on viewers)
+Code: `modules/video/stickman.py`, tests: `tests/test_stickman.py` (offline, no AI, no network).
+The cut-out figure of part A was four rigid sprites: the legs never moved and each arm was one stiff piece.
+The default figure (`animation.RIG = "jointed"`) is now a 2D skeleton drawn every frame:
+
+- joints: shoulder-elbow-hand, hip-knee-foot, torso lean, head tilt; the lowest foot always stands on the ground,
+  so bending the knees really crouches and `dy` really jumps;
+- 13 actions: idle, talk, walk, run, wave, point, think, idea, shrug, cheer, jump, surprised, nod;
+- choreography from the Motion Planner pose and role: walk in (constant speed) -> main pose -> explaining gestures;
+  think scenes end with an "idea", the summary scene ends with a cheer (lively) or a nod. Poses are blended for
+  0.28 s between beats. `script=[Beat(...)]` lets a caller give the beats directly (planned: AI director, step b);
+- lip-sync: one mouth open-close per syllable while a word is spoken (same word timing as the objects, `sync.py`),
+  closed in the pauses; blinking every 2.6-4.4 s (deterministic);
+- cost: about 2 ms per frame for the figure (measured on the dev container, not on the team's laptops).
+
+The figure is timed in SECONDS (walking speed, mouth, blinks), the props still in fractions u of the scene.
+The old figure is kept: `character_layers(..., rig="cutout")` or `RIG = "cutout"`.
+Not measured yet: whether viewers find it more lively than the cut-out figure (watch test planned).
+Known limits: word times are estimated from the text (H1), so the mouth follows the estimate, not the real audio;
+one figure per scene; legs swing in the picture plane (profile walk) while the face looks at the viewer.

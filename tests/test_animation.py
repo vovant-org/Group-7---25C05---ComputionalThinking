@@ -141,9 +141,18 @@ def test_frames_are_deterministic():
 
 
 def test_motion_follows_the_scene_length_not_the_clock():
+    """Props follow the fraction u of the scene. The jointed figure is timed in seconds on purpose
+    (walking speed, lip-sync and blinking must not stretch with the scene), so it is left out here."""
     cs = compose_animation_scene(scene("cause_effect"), "claim", ST, 2, 12)
+    cs.layers = [l for l in cs.layers if l.name != "stickman"]
     short, long = cs.make_renderer(5.0, 5.0, 2, ST), cs.make_renderer(10.0, 10.0, 2, ST)
     assert np.array_equal(short.frame(2.5), long.frame(5.0))                 # same u = 0.5
+
+
+def test_jointed_figure_walks_at_the_same_speed_in_short_and_long_scenes():
+    cs = compose_animation_scene(scene("cause_effect"), "claim", ST, 2, 12)
+    fig = next(l for l in cs.layers if l.name == "stickman")
+    assert fig.pose_at(0.5, 6.0)[1] == fig.pose_at(0.5, 9.0)[1]             # same seconds, same place
 
 
 def test_picture_shape_and_type():
@@ -155,7 +164,12 @@ def test_picture_shape_and_type():
 def test_animated_scene_has_no_drawn_text_and_names_its_layout():
     cs = compose_animation_scene(scene("comparison"), "claim", ST, 1, 6)
     assert cs.labels == [] and cs.layout == "cutout:bars" and not cs.overflow
-    assert cs.plan.mirror and {l.name for l in cs.layers} >= {"body", "head", "arm_front", "arm_back"}
+    assert cs.plan.mirror and "stickman" in {l.name for l in cs.layers}          # the jointed figure (stickman.py)
+    old = compose_animation_scene(scene("comparison"), "claim", ST, 1, 6)
+    from modules.video.animation import RIG, Stage, character_layers
+    st = Stage(fx=300, cx=840, s=1, gy=540, accent=(1, 2, 3), accent2=(4, 5, 6), energy=1.0)
+    assert {l.name for l in character_layers(st, "point", rig="cutout")} == {"body", "head", "arm_front", "arm_back"}
+    assert RIG == "jointed" and old.layers
 
 
 def test_hidden_layer_is_not_drawn():

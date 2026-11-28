@@ -9,7 +9,9 @@ scene. Time is a fraction u in [0, 1] of the scene length, so the same movement 
   Layer     sprite + tracks x, y, rot (degrees, counter-clockwise), scale, sy, alpha
   sprite    drawn 2x larger and shrunk (anti-aliasing); padded so that its CENTRE is the pivot,
             which makes rotation and scaling about the pivot a plain "rotate / resize the image"
-  Character a stick figure made of body, head and two arms (the arms turn about the shoulders)
+  Character a stick figure. Default (RIG = "jointed"): the jointed figure of `stickman.py` (knees, elbows,
+            walking, lip-sync, ~13 actions). RIG = "cutout": the older figure of four rigid sprites (body, head,
+            two arms that turn about the shoulders); kept for comparison and as a fallback
   Props     what the character talks about: cause -> effect, bars, steps, chart, light bulb, bubble
 
 What the character does and which prop is drawn comes from `motion_planner.plan_motion`.
@@ -40,6 +42,7 @@ WHITE = (255, 255, 255)
 GREY = (150, 165, 190)
 YELLOW = (250, 205, 70)
 GROUND_Y = 540                           # feet and prop baselines (720p); the subtitle band starts at 600
+RIG = "jointed"                          # "jointed" (stickman.py) or "cutout" (the older rigid figure below)
 
 
 # ------------------------------------------------------------------ keyframe tracks
@@ -195,7 +198,15 @@ def _bob(y0: float, e: float) -> Track:
     return Track(join(((0.0, y0),), wiggle(y0, 4.0 * e, 4, 0.16, 1.0, n=8)), ease=False)
 
 
-def character_layers(stage: Stage, pose: str) -> list[Layer]:
+def character_layers(stage: Stage, pose: str, *, rig: Optional[str] = None, role: str = "body",
+                     narration: str = "", audio_s: Optional[float] = None, script=None) -> list[Layer]:
+    """The figure of a scene. rig None = RIG. The jointed figure walks in, acts out `pose` (or `script`, a list of
+    stickman.Beat) and moves its mouth with `narration`; the cut-out figure ignores role / narration / script."""
+    if (rig or RIG) == "jointed":
+        from modules.video.stickman import stickman_layer
+        return [stickman_layer(stage, pose, role=role, narration=narration, audio_s=audio_s, script=script)]
+    if (rig or RIG) != "cutout":
+        raise ValueError(f"unknown rig {rig!r}")
     s, e, fx, gy = stage.s, stage.energy, stage.fx, stage.gy
     hip_y = gy - 106
     neck_y = hip_y - 100
@@ -392,6 +403,9 @@ class AnimatedScene:
     overflow: bool = False
 
     def make_renderer(self, duration_s: float, audio_s: float, index: int, st: Style) -> "LayerRenderer":
+        for layer in self.layers:                      # the jointed figure moves its mouth with the real audio length
+            if hasattr(layer, "audio_s"):
+                layer.audio_s = audio_s
         return LayerRenderer(self, duration_s, st)
 
 
@@ -425,6 +439,9 @@ class LayerRenderer:
         u = min(1.0, max(0.0, t / self.dur))
         img = self.scene.base.copy()
         for i, layer in enumerate(self.scene.layers):
+            if hasattr(layer, "paint"):                # drawn every frame (stickman.StickmanLayer)
+                layer.paint(img, u, u * self.dur, self.dur)
+                continue
             a, sc, sy = layer.alpha(u), layer.scale(u), layer.sy(u)
             if a <= 0.01 or sc <= 0.01 or sy <= 0.01:
                 continue
@@ -448,7 +465,7 @@ def compose_animation_scene(scene: Scene, claim_text: str, st: Style = Style(), 
     d.line((st.margin, GROUND_Y + 2, w - st.margin, GROUND_Y + 2), fill=(176, 186, 208, 255), width=4)
     d.ellipse((stage.fx - 70, GROUND_Y - 2, stage.fx + 70, GROUND_Y + 12), fill=(120, 130, 155, 70))
 
-    layers = character_layers(stage, plan.pose) + PROP_BUILDERS[plan.prop](stage)
+    layers = character_layers(stage, plan.pose, role=plan.role, narration=scene.narration) + PROP_BUILDERS[plan.prop](stage)
     layers.sort(key=lambda l: l.z)
     return AnimatedScene(scene_id=scene.scene_id, plan=plan, base=base, layers=layers, claim_text=claim_text,
                          layout=f"cutout:{plan.prop}", requested_layout=scene.layout)

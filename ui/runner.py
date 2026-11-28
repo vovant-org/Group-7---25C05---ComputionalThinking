@@ -182,6 +182,7 @@ class GenParams:
     ai_folder: str = ""                    # folder of hand-made pictures for ai_image == "folder"
     pitch_hz: int = 0                      # voice pitch offset (Edge voices only), proposed by voice casting
     voice_mood: str = ""                   # mood chosen by voice casting ("" = the user picked the voice)
+    ai_director: str = "off"               # off | auto | pollinations | gemini: an LLM chooses the stick figure's gestures (ANIMATION)
     content_origin: str = "user"           # "ai": the reference text was written by the REASON step (not verified)
 
 
@@ -232,6 +233,16 @@ def generate(p: GenParams, progress: Optional[Callable[[float, str], None]] = No
         engine = make_engine(p.engine_kind, voice, p.speed, p.allow_online, voice.planning_wpm(p.speed), pitch_hz=p.pitch_hz)
     except Exception as exc:                                   # missing package, online not confirmed, ...
         return Outcome(False, error=f"Voice engine: {exc}")
+    director = None
+    if p.ai_director != "off" and p.fmt == "ANIMATION":
+        from modules.ai.llm import make_llm
+        from modules.ai.net import AIError
+        if not p.ai_online:
+            return Outcome(False, error="AI: the AI director sends the narration to an online service: tick the confirmation first.")
+        try:
+            director = make_llm(p.ai_director)
+        except AIError as exc:
+            return Outcome(False, error=f"AI: {exc}")
     claims = build_claims(p.source, p.pack, p.reference)
     text = request_text(p.topic, p.instructions)
     ai = None
@@ -263,7 +274,7 @@ def generate(p: GenParams, progress: Optional[Callable[[float, str], None]] = No
                      output_format=OutputFormat(p.fmt), burn_subtitles=p.subtitles == "burn",
                      soft_subtitles=p.subtitles != "off", visual_engine=p.topic_aware, progress=progress, quality=p.quality,
                      art=ai.art if ai else None, visuals=ai.visuals if ai else None,
-                     ai_notes=ai.notes if ai else (), on_stage=on_stage)
+                     ai_notes=ai.notes if ai else (), on_stage=on_stage, director=director)
     facts = facts_from_pipeline(res.pipeline, len(claims))
     silent = bool(res.report.get("voice_is_silent")) if res.ok else None
     if not res.ok:

@@ -149,6 +149,7 @@ def _start() -> None:
         engine_kind=ss["engine"], allow_online=bool(ss["allow_online"]), subtitles=ss["subtitles"],
         topic_aware=bool(ss["topic_aware"]), language=lang, quality=ss["quality"],
         ai_read=ss["ai_read"], ai_image=ss["ai_image"], ai_online=bool(ss["ai_online"]), ai_folder=ss["ai_folder"].strip(),
+        ai_director=ss["ai_director"],
         pitch_hz=int(ss["pitch"]) if ss["engine"] == "edge" else 0, voice_mood=ss["voice_mood"] if ss["auto_voice"] else "",
         content_origin=ss["ref_origin"] if ss["source"] == "text" and ss["reference"].strip() else "user")
     ss["gen_state"] = "running"
@@ -195,7 +196,8 @@ def _validate(ctx: dict, *, final: bool) -> list[dict]:
               voice_language=ss["language"], upload_error=ss["upload_error"], detected_language=ctx["detected"],
               ai_reads=ss["ai_read"] != "off")
     if final:
-        needs = ss["ai_read"] != "off" or ss["ai_image"] in ("pollinations", "cloudflare")
+        needs = (ss["ai_read"] != "off" or ss["ai_image"] in ("pollinations", "cloudflare")
+                 or (ss["fmt"] == "ANIMATION" and ss["ai_director"] != "off"))
         return validate_inputs(ffmpeg_ok=runner.ffmpeg_ok(), online_ok=bool(ss["allow_online"]), engine_kind=ss["engine"],
                                ai_online_needed=needs, ai_online_ok=bool(ss["ai_online"]), **kw)
     return validate_inputs(ffmpeg_ok=True, online_ok=True, engine_kind="system", **kw)
@@ -391,7 +393,15 @@ def _step_budget(ctx: dict) -> None:
                           "<claim id>.png in a folder (the prompt kit comes from the command line: --export-kit). Text on screen is still drawn by code.")
             if ss["ai_image"] == "folder":
                 st.text_input("Folder with the pictures", key=S.seed("ai_folder"), on_change=S.sync, args=("ai_folder",))
-        if ss["ai_read"] != "off" or ss["ai_image"] in ("pollinations", "cloudflare"):
+        if ss["fmt"] == "ANIMATION":
+            st.radio("AI director (stick figure gestures)", ["off", "auto", "pollinations", "gemini"], key=S.seed("ai_director"),
+                     on_change=S.sync, args=("ai_director",), horizontal=True,
+                     format_func={"off": "Off", "auto": "Auto (Gemini, then Pollinations)", "pollinations": "Pollinations (no key)",
+                                  "gemini": "Gemini (free key)"}.get,
+                     help="An AI reads the narration of every scene and chooses which gesture the figure makes at which word "
+                          "(point, think, idea, shrug...). It only picks from a fixed list; if it fails the default gestures are used.")
+        if (ss["ai_read"] != "off" or ss["ai_image"] in ("pollinations", "cloudflare")
+                or (ss["fmt"] == "ANIMATION" and ss["ai_director"] != "off")):
             st.checkbox("I understand my text is sent to an online AI service", key=S.seed("ai_online"), on_change=S.sync, args=("ai_online",),
                         help="Do not send private or sensitive text.")
         if ss["fmt"] == "ANIMATION":

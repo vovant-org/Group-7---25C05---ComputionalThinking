@@ -16,7 +16,7 @@ DEFAULTS: dict[str, Any] = {
     "view": "create", "theme": "dark", "step": 1, "quality": "standard", "topic": "", "instructions": "", "reference": "", "upload_name": "", "upload_error": "", "upload_n": 0,
     "source": "text", "pack": "sleep", "language": "en", "fmt": "INFOGRAPHIC", "duration": 90, "auto_budget": True, "budget": 100,
     "speed": 1.0, "engine": None, "allow_online": False, "subtitles": "burn", "topic_aware": True,
-    "ai_read": "off", "ai_image": "off", "ai_online": False, "ai_folder": "",
+    "ai_read": "off", "ai_image": "off", "ai_online": False, "ai_folder": "", "ai_director": "off",
     "research_ai": "auto", "ref_origin": "user", "research_pending": False, "research_info": None,   # REASON step
     "auto_voice": True, "pitch": 0, "cast_applied": None, "voice_mood": "",   # voice casting: voice/speed/pitch follow the topic
     "voice_en": None, "voice_vi": None, "project": None, "sel_scene": None, "board_view": "Cards",

@@ -160,7 +160,7 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
                style: Style = Style(), progress: Optional[Callable[[float, str], None]] = None,
                max_adjustments: int = MAX_ADJUSTMENTS, visual_engine: bool = True,
                quality: str = DEFAULT_QUALITY, art=None, visuals: Optional[Mapping[str, str]] = None,
-               ai_notes: Sequence[str] = (),
+               ai_notes: Sequence[str] = (), director=None,
                on_stage: Optional[Callable[[str, str, str], None]] = None) -> VideoResult:
     out_path = Path(out_path)
     if work_dir is None:                                  # dry run: scratch space only, nothing left behind
@@ -209,6 +209,7 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
 
     fmt = res.decision.fmt
     total_scenes = len(res.scenes)
+    director_info: dict = {}                         # AI director (modules/ai/director.py), ANIMATION only
     ai_mode, ai_fallback = False, ""                 # ANIMATION drawn from AI pictures (modules/video/ai_animation.py)
     if fmt == OutputFormat.INFOGRAPHIC:
         pictures: dict = {}                         # AI pictures (modules/ai): one per scene, made from the claim itself
@@ -222,7 +223,11 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
                           for i, s in enumerate(res.scenes)}
         problems = [p for cs in composed.values() for p in check_labels(cs)]
     elif fmt == OutputFormat.ANIMATION:
-        composed = None
+        composed, directions = None, {}
+        if director is not None and not (art is not None and visuals):      # AI pictures do not use the stick figure
+            from modules.ai.director import direct_scenes
+            dres = direct_scenes(director, res.scenes)
+            directions, director_info = dres.directions, dres.info
         if art is not None and visuals:             # AI pictures cut out and animated by code; all-or-nothing (policy A)
             from modules.video.ai_animation import collect_pictures, compose_ai_scenes
             pictures, ai_fallback = collect_pictures(art, res.scenes, visuals, progress=progress)
@@ -233,9 +238,10 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
         elif visual_engine:                           # Topic-aware Visual Engine: objects and motion follow the content
             from modules.visual_engine import analyse_topic, compose_topic_scenes
             profile = analyse_topic(request_text, [c.text for c in res.selection.claims])
-            composed = compose_topic_scenes(res.scenes, profile, style)
+            composed = compose_topic_scenes(res.scenes, profile, style, directions)
         else:                                       # generic stick figure + six props
-            composed = {s.scene_id: compose_animation_scene(s, s.narration, style, i, total_scenes)
+            composed = {s.scene_id: compose_animation_scene(s, s.narration, style, i, total_scenes,
+                                                          directions=directions.get(s.scene_id))
                         for i, s in enumerate(res.scenes)}
         problems = [p for cs in composed.values() for p in check_animation(cs, style)]
     else:
@@ -258,6 +264,8 @@ def make_video(request_text: str, claims: Sequence, out_path: Path, *, engine: S
                           out_path if render else None)
     if ai_notes:
         report["ai_notes"] = list(ai_notes)
+    if director_info:
+        report["director"] = director_info
     if art is not None and fmt == OutputFormat.INFOGRAPHIC:
         report["ai_images"] = art.summary(total_scenes)
         report["notes"] = report.get("notes", []) + [
@@ -382,6 +390,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--ai-folder", type=Path, default=None, help="folder for --ai-image folder, and where the prompt kit is written")
     ap.add_argument("--export-kit", action="store_true", help="write prompts.md/json (one prompt per scene) to --ai-folder and stop")
     ap.add_argument("--no-visual-engine", action="store_true", help="ANIMATION: use the generic stick-figure animation")
+    ap.add_argument("--ai-director", choices=["off", "auto", "pollinations", "gemini"], default="off",
+                    help="ANIMATION: an LLM chooses the stick figure's gestures from the narration (online: needs --allow-online)")
     a = ap.parse_args(argv)
 
     reference = a.reference.read_text(encoding="utf-8") if a.reference else ""
@@ -427,6 +437,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 ap.error("--export-kit needs --ai-folder")
             print("prompt kit written to", write_kit(claims, ai.visuals or {}, a.ai_folder))
             return 0
+    director = None
+    if a.ai_director != "off":
+        from modules.ai.llm import make_llm
+        from modules.ai.net import AIError
+        if not a.allow_online:
+            print("AI error: the AI director sends the narration to an online service: confirm with --allow-online", file=sys.stderr)
+            return 2
+        try:
+            director = make_llm(a.ai_director)
+        except AIError as exc:
+            print(f"AI error: {exc}", file=sys.stderr)
+            return 2
     lib = load_library()
     voice = lib.get(a.voice_id) if a.voice_id else lib.default(lang)
     planning_wpm = voice.planning_wpm(a.speed)
@@ -456,7 +478,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                    fps=a.fps, burn_subtitles=not a.no_burn, soft_subtitles=not a.no_soft_subs,
                    render=not a.dry_run, progress=show, visual_engine=not a.no_visual_engine, quality=a.quality,
                    art=ai.art if ai else None, visuals=ai.visuals if ai else None,
-                   ai_notes=ai.notes if ai else ())
+                   ai_notes=ai.notes if ai else (), director=director)
     print()
     for line in r.log:
         print("  adjust:", line)

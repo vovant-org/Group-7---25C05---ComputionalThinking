@@ -133,6 +133,7 @@ class TopicScene:
     warnings: list[str] = field(default_factory=list)
     overflow: bool = False
     sync_log: list[dict] = field(default_factory=list)
+    directions: Optional[list] = None                          # AI director: [(action, from_word)] for the figure
     _built: dict = field(default_factory=dict, repr=False)
 
     @property
@@ -176,7 +177,7 @@ class TopicScene:
             stage = Stage(fx=st.size[0] - 300 if self.mirror else 300, cx=(x0 + x1) / 2, s=s, gy=GROUND_Y,
                           accent=self.accent, accent2=self.accent2, energy=self.plan.energy)
             layers += character_layers(stage, self.plan.pose, role=self.plan.role, narration=self.narration,
-                                       audio_s=min(audio_s, duration_s))
+                                       audio_s=min(audio_s, duration_s), directions=self.directions)
         layers.sort(key=lambda l: l.z)
         self._built[key] = layers
         return layers
@@ -188,7 +189,7 @@ class TopicScene:
 
 
 def compose_topic_scene(scene: Scene, claim_text: str, profile: TopicProfile, st: Style = Style(), index: int = 0,
-                        total: int = 1, recent: Sequence[tuple] = ()) -> TopicScene:
+                        total: int = 1, recent: Sequence[tuple] = (), directions: Optional[list] = None) -> TopicScene:
     base_plan = plan_motion(scene, index, total)
     choices = select_objects(scene.narration, claim_text, profile, index, scene.explain_pattern, recent)
     actor = profile.actor
@@ -204,16 +205,17 @@ def compose_topic_scene(scene: Scene, claim_text: str, profile: TopicProfile, st
     return TopicScene(scene_id=scene.scene_id, plan=plan, base=base, claim_text=claim_text, narration=scene.narration,
                       domain=profile.domain, choices=choices, actor=actor, mirror=plan.mirror, accent=accent,
                       accent2=accent2, trend=trend, vietnamese=profile.vietnamese, layout=f"cutout:{plan.prop}",
-                      requested_layout=scene.layout)
+                      requested_layout=scene.layout, directions=directions)
 
 
-def compose_topic_scenes(scenes: Sequence[Scene], profile: TopicProfile, st: Style = Style()) -> dict[int, TopicScene]:
+def compose_topic_scenes(scenes: Sequence[Scene], profile: TopicProfile, st: Style = Style(),
+                         directions: Optional[dict] = None) -> dict[int, TopicScene]:
     """All scenes of a video, in order, so a scene can avoid repeating the pictures of the previous ones."""
     out: dict[int, TopicScene] = {}
     recent: list[tuple] = []
     total = len(scenes)
     for i, sc in enumerate(scenes):
-        ts = compose_topic_scene(sc, sc.narration, profile, st, i, total, recent)
+        ts = compose_topic_scene(sc, sc.narration, profile, st, i, total, recent, (directions or {}).get(sc.scene_id))
         out[sc.scene_id] = ts
         recent = (recent + [ts.signature])[-RECENT:]
     return out

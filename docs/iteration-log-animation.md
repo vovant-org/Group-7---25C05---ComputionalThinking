@@ -73,3 +73,16 @@ The old figure is kept: `character_layers(..., rig="cutout")` or `RIG = "cutout"
 Not measured yet: whether viewers find it more lively than the cut-out figure (watch test planned).
 Known limits: word times are estimated from the text (H1), so the mouth follows the estimate, not the real audio;
 one figure per scene; legs swing in the picture plane (profile walk) while the face looks at the viewer.
+
+## E. AI director for the jointed figure (design note, NOT yet measured on viewers)
+Code: `modules/ai/director.py` + `stickman.beats_from_directions`, tests: `tests/test_director.py` (fake LLM, no network).
+One LLM call per video: the narration of every scene with numbered words goes in; per scene a short list of
+`{"from_word", "action"}` comes out, and the figure starts that gesture when the narrator says that word (same word times
+as the lip-sync). The model only picks from a fixed menu (no walk/run); invalid actions, out-of-range words and beats closer
+than 0.7 s are dropped; a scene without a valid answer keeps the default choreography; a provider error changes nothing and
+the report (`report["director"]`) says so. The figure still walks in first. Online: needs the user's consent (`--allow-online`,
+UI checkbox). Domains without a presenter figure (nature, space, tech) ignore the directions.
+
+Not measured yet (do not quote numbers before): share of scenes with a valid answer on a real provider, whether viewers find
+the directed gestures better than the Motion Planner's fixed ones, call time. Known limits: word times are estimated (H1),
+so a gesture can start a little early or late against the real voice; the prompt and MAX_BEATS = 5 are our own choice.

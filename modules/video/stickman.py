@@ -287,6 +287,35 @@ def choreograph(pose: str, dur: float, fx: float, s: int, role: str = "body", en
     return beats
 
 
+MIN_BEAT_S = 0.7                        # a directed gesture lasts at least this long
+DIRECT_LEAD_S = 0.15                    # a gesture starts this long BEFORE its word (the eye needs a moment)
+
+
+def beats_from_directions(directions: Sequence[tuple], narration: str, audio_s: float, dur: float, fx: float) -> list[Beat]:
+    # directions = [(action, from_word)]: the gesture starts when the narrator says that word (same word times as the mouth).
+    # The figure always walks in first; a gap before the first gesture is filled with "talk"; invalid or too close beats are
+    # dropped (walk / run are never directed). Covers [0, dur] without gaps.
+    from modules.visual_engine import sync
+    dur = max(float(dur), 0.5)
+    walk = min(WALK_IN_PX / WALK_SPEED, 0.4 * dur)
+    times = sync.word_times(narration or "", max(0.0, audio_s))
+    starts: list[tuple[float, str]] = []
+    for action, w in sorted(directions, key=lambda d: d[1]):
+        if action not in ACTIONS or action in MOVING or not 0 <= w < len(times):
+            continue
+        t = max(walk, times[w][1] - DIRECT_LEAD_S)
+        if t > dur - MIN_BEAT_S or (starts and t - starts[-1][0] < MIN_BEAT_S):
+            continue
+        starts.append((t, action))
+    if not starts or starts[0][0] > walk + 0.3:
+        starts.insert(0, (walk, "talk"))
+    starts[0] = (walk, starts[0][1])
+    ends = [t for t, _ in starts[1:]] + [dur]
+    beats = [Beat("walk", 0.0, walk, x_to=fx)]
+    beats += [Beat(a, t, e) for (t, a), e in zip(starts, ends)]
+    return beats
+
+
 # ------------------------------------------------------------------ lip-sync
 _VOWELS = re.compile(r"[aeiouyàáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵ]+",
                      re.IGNORECASE)
@@ -353,17 +382,24 @@ class StickmanLayer(Layer):
     narration: str = ""
     audio_s: Optional[float] = None
     script: Optional[Sequence[Beat]] = None
+    directions: Optional[Sequence[tuple]] = None     # [(action, from_word)] chosen by the AI director (modules/ai/director.py)
     seed: int = 0
     color: tuple = INK
     _cache: dict = field(default_factory=dict, repr=False)
 
     # ---- timing
     def beats(self, dur: float) -> list[Beat]:
-        key = ("beats", round(dur, 3))
+        key = ("beats", round(dur, 3), round(self.audio_s or 0.0, 3))
         if key not in self._cache:
             st = self.stage
-            self._cache[key] = list(self.script) if self.script else choreograph(
-                self.pose_name, dur, st.fx, st.s, self.role, st.energy)
+            if self.script:
+                beats = list(self.script)
+            elif self.directions:
+                audio = min(self.audio_s, dur) if self.audio_s else dur * 0.92
+                beats = beats_from_directions(self.directions, self.narration, audio, dur, st.fx)
+            else:
+                beats = choreograph(self.pose_name, dur, st.fx, st.s, self.role, st.energy)
+            self._cache[key] = beats
         return self._cache[key]
 
     def spans(self, dur: float) -> list[tuple[float, float, int]]:
@@ -501,12 +537,12 @@ class StickmanLayer(Layer):
 
 def stickman_layer(stage: Stage, pose: str, *, role: str = "body", narration: str = "",
                    audio_s: Optional[float] = None, script: Optional[Sequence[Beat]] = None, seed: int = 0,
-                   z: int = 3) -> StickmanLayer:
+                   z: int = 3, directions: Optional[Sequence[tuple]] = None) -> StickmanLayer:
     """One jointed figure standing at stage.fx on stage.gy, facing stage.s."""
     if script is None and pose not in MAIN_ACTION:
         raise ValueError(f"unknown pose {pose!r}")
     blank = Image.new("RGBA", (2, 2), (0, 0, 0, 0))
     return StickmanLayer(name="stickman", sprite=blank, x=hold(stage.fx), y=hold(stage.gy), z=z, stage=stage,
                          pose_name=pose, role=role, narration=narration, audio_s=audio_s,
-                         script=list(script) if script else None,
+                         script=list(script) if script else None, directions=list(directions) if directions else None,
                          seed=seed if seed else zlib.crc32(f"{pose}|{narration}".encode()) % 1000)

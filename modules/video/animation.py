@@ -199,13 +199,13 @@ def _bob(y0: float, e: float) -> Track:
 
 
 def character_layers(stage: Stage, pose: str, *, rig: Optional[str] = None, role: str = "body",
-                     narration: str = "", audio_s: Optional[float] = None, script=None, directions=None) -> list[Layer]:
+                     narration: str = "", audio_s: Optional[float] = None, script=None, directions=None, clips=None) -> list[Layer]:
     """The figure of a scene. rig None = RIG. The jointed figure walks in, acts out `pose` (or `script`, a list of
     stickman.Beat) and moves its mouth with `narration`; the cut-out figure ignores role / narration / script."""
     if (rig or RIG) == "jointed":
         from modules.video.stickman import stickman_layer
         return [stickman_layer(stage, pose, role=role, narration=narration, audio_s=audio_s, script=script,
-                               directions=directions)]
+                               directions=directions, clips=clips)]
     if (rig or RIG) != "cutout":
         raise ValueError(f"unknown rig {rig!r}")
     s, e, fx, gy = stage.s, stage.energy, stage.fx, stage.gy
@@ -452,7 +452,7 @@ class LayerRenderer:
 
 
 def compose_animation_scene(scene: Scene, claim_text: str, st: Style = Style(), index: int = 0,
-                            total: int = 1, directions=None) -> AnimatedScene:
+                            total: int = 1, directions=None, clips=None) -> AnimatedScene:
     """Build the layers of one scene. Raises ValueError for a position outside the video."""
     plan = plan_motion(scene, index, total)
     w, h = st.size
@@ -467,7 +467,7 @@ def compose_animation_scene(scene: Scene, claim_text: str, st: Style = Style(), 
     d.ellipse((stage.fx - 70, GROUND_Y - 2, stage.fx + 70, GROUND_Y + 12), fill=(120, 130, 155, 70))
 
     layers = character_layers(stage, plan.pose, role=plan.role, narration=scene.narration,
-                              directions=directions) + PROP_BUILDERS[plan.prop](stage)
+                              directions=directions, clips=clips) + PROP_BUILDERS[plan.prop](stage)
     layers.sort(key=lambda l: l.z)
     return AnimatedScene(scene_id=scene.scene_id, plan=plan, base=base, layers=layers, claim_text=claim_text,
                          layout=f"cutout:{plan.prop}", requested_layout=scene.layout)

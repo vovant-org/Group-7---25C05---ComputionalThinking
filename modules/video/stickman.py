@@ -383,6 +383,7 @@ class StickmanLayer(Layer):
     audio_s: Optional[float] = None
     script: Optional[Sequence[Beat]] = None
     directions: Optional[Sequence[tuple]] = None     # [(action, from_word)] chosen by the AI director (modules/ai/director.py)
+    clips: Optional[dict] = None                     # action -> mocap.MocapClip: a beat of that action plays the clip (modules/video/mocap.py)
     seed: int = 0
     color: tuple = INK
     _cache: dict = field(default_factory=dict, repr=False)
@@ -426,6 +427,12 @@ class StickmanLayer(Layer):
                 x = nx if f < 1.0 else b.x_to
         return x, 2 * math.pi * walked / STRIDE_PX
 
+    def _act(self, b: Beat, t: float, st, ctx: Ctx) -> Pose:
+        clip = (self.clips or {}).get(b.action)
+        if clip is not None:
+            return clip.pose_at(max(0.0, t))
+        return ACTIONS[b.action](max(0.0, t), b.t1 - b.t0, st.energy, ctx)
+
     def pose_at(self, t: float, dur: float) -> tuple[Pose, float]:
         """(pose, x) at time t."""
         beats = self.beats(dur)
@@ -437,10 +444,10 @@ class StickmanLayer(Layer):
             if b.t0 <= t:
                 i = j
         b = beats[i]
-        cur = ACTIONS[b.action](max(0.0, t - b.t0), b.t1 - b.t0, st.energy, ctx)
+        cur = self._act(b, t - b.t0, st, ctx)
         if i > 0 and t - b.t0 < BLEND_S:
             p = beats[i - 1]
-            prev = ACTIONS[p.action](t - p.t0, p.t1 - p.t0, st.energy, ctx)
+            prev = self._act(p, t - p.t0, st, ctx)
             cur = blend(prev, cur, smooth((t - b.t0) / BLEND_S))
         return cur, x
 
@@ -537,12 +544,12 @@ class StickmanLayer(Layer):
 
 def stickman_layer(stage: Stage, pose: str, *, role: str = "body", narration: str = "",
                    audio_s: Optional[float] = None, script: Optional[Sequence[Beat]] = None, seed: int = 0,
-                   z: int = 3, directions: Optional[Sequence[tuple]] = None) -> StickmanLayer:
+                   z: int = 3, directions: Optional[Sequence[tuple]] = None, clips: Optional[dict] = None) -> StickmanLayer:
     """One jointed figure standing at stage.fx on stage.gy, facing stage.s."""
     if script is None and pose not in MAIN_ACTION:
         raise ValueError(f"unknown pose {pose!r}")
     blank = Image.new("RGBA", (2, 2), (0, 0, 0, 0))
     return StickmanLayer(name="stickman", sprite=blank, x=hold(stage.fx), y=hold(stage.gy), z=z, stage=stage,
                          pose_name=pose, role=role, narration=narration, audio_s=audio_s,
-                         script=list(script) if script else None, directions=list(directions) if directions else None,
+                         script=list(script) if script else None, directions=list(directions) if directions else None, clips=clips,
                          seed=seed if seed else zlib.crc32(f"{pose}|{narration}".encode()) % 1000)

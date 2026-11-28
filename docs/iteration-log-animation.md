@@ -86,3 +86,18 @@ UI checkbox). Domains without a presenter figure (nature, space, tech) ignore th
 Not measured yet (do not quote numbers before): share of scenes with a valid answer on a real provider, whether viewers find
 the directed gestures better than the Motion Planner's fixed ones, call time. Known limits: word times are estimated (H1),
 so a gesture can start a little early or late against the real voice; the prompt and MAX_BEATS = 5 are our own choice.
+
+## F. Motion capture for the jointed figure (design note, NOT yet measured, NOT yet run on real MoMask output)
+Code: `modules/video/mocap.py` + `clips=` in `stickman.py`, tests: `tests/test_mocap.py` (pure maths, fake provider) and
+`tests/test_mocap_wiring.py`. A text-to-motion model (MoMask) gives a 22-joint 3D skeleton; the code turns it into the 2D
+`Pose` angles the figure already draws (limb angle = atan2(z + 0.7|x|, -y), right side = front arm), smooths it and plays it
+back (ping-pong when the beat is longer than the clip). The director still decides WHICH action starts at which word; a beat
+whose action has a clip plays the clip instead of the hand-coded movement; walk-in and lip-sync are unchanged.
+Privacy: each action has ONE fixed English prompt (`ACTION_PROMPTS`), so the narration is never sent and a clip is made once
+per action, then cached in `outputs/mocap_cache/` (not once per scene). A failing provider changes nothing (hand-coded action).
+Providers: `DirMocap` (<action>.npy made elsewhere, offline) and `LocalMoMask` (runs gen_t2m.py of a local clone on the CPU;
+the command line and output folder are from the README and NOT verified). The public Hugging Face Space is NOT used: it returns
+HTML with a BVH link instead of a documented API, and it logs the prompts on the owner's side.
+Not measured: clip time per action on the team's laptops, whether the retargeted gestures look better than the hand-coded ones
+(watch test planned), how often the 3D->2D projection hides an arm movement. Known limits: one fixed clip per action (no variety
+inside a video), the figure does not travel (dx = 0), expressions stay as in the hand-coded actions.
